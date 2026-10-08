@@ -1,0 +1,12 @@
+# Configuration Nixpacks pour Coolify
+[phases.setup]
+nixPkgs = ["nodejs_22", "git", "bash", "curl", "wget"]
+
+[phases.install]
+cmds = ["npm install --omit=dev"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "node server.js"

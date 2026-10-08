@@ -6,7 +6,7 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { execFile, spawn } from 'child_process';
+import { execFile, spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 import http from 'http';
 import { WebSocketServer } from 'ws';
@@ -16,6 +16,73 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// =============================================================================
+// GESTION DU BINAIRE GIT ET DU PATH D'EXÉCUTION
+// =============================================================================
+export function getExecEnv() {
+  const extraPaths = [
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+    '/nix/var/nix/profiles/default/bin',
+    '/root/.nix-profile/bin',
+  ];
+  const sep = process.platform === 'win32' ? ';' : ':';
+  const currentPath = process.env.PATH || '';
+  return {
+    ...process.env,
+    PATH: `${currentPath}${sep}${extraPaths.join(sep)}`,
+  };
+}
+
+let GIT_BIN = 'git';
+
+function resolveGitBinary() {
+  const candidates = [
+    'git',
+    '/usr/bin/git',
+    '/usr/local/bin/git',
+    '/bin/git',
+    '/nix/var/nix/profiles/default/bin/git',
+    '/root/.nix-profile/bin/git',
+  ];
+
+  for (const bin of candidates) {
+    try {
+      execSync(`${bin} --version`, { env: getExecEnv(), stdio: 'ignore' });
+      GIT_BIN = bin;
+      console.log(`✓ Binaire Git détecté : ${bin}`);
+      return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
+// Détection / installation automatique au démarrage
+if (!resolveGitBinary()) {
+  console.warn('⚠️ Git introuvable dans le PATH standard. Tentative d\'installation automatique...');
+  try {
+    execSync('apk add --no-cache git bash', { env: getExecEnv(), stdio: 'inherit' });
+    resolveGitBinary();
+  } catch (_) {}
+  if (GIT_BIN === 'git') {
+    try {
+      execSync('apt-get update && apt-get install -y git', { env: getExecEnv(), stdio: 'inherit' });
+      resolveGitBinary();
+    } catch (_) {}
+  }
+}
+
+// Configuration globale Git pour safe.directory et branch main
+try {
+  execFile(GIT_BIN, ['config', '--global', '--add', 'safe.directory', '*'], { env: getExecEnv() }, () => {});
+  execFile(GIT_BIN, ['config', '--global', 'init.defaultBranch', 'main'], { env: getExecEnv() }, () => {});
+  execFile(GIT_BIN, ['config', '--global', 'user.name', 'DevSpace'], { env: getExecEnv() }, () => {});
+  execFile(GIT_BIN, ['config', '--global', 'user.email', 'dev@oussamma.tn'], { env: getExecEnv() }, () => {});
+} catch (_) {}
 
 const app = express();
 const server = http.createServer(app);
@@ -45,12 +112,6 @@ const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_DIR || path.join(__dir
 if (!fs.existsSync(WORKSPACE_ROOT)) {
   fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
 }
-
-// Configuration globale Git pour autoriser les répertoires montés en volume (évite l'erreur dubious ownership)
-try {
-  execFile('git', ['config', '--global', '--add', 'safe.directory', '*'], () => {});
-  execFile('git', ['config', '--global', 'init.defaultBranch', 'main'], () => {});
-} catch (_) {}
 
 // Détection de proxy pour Coolify / Traefik
 app.set('trust proxy', true);
@@ -153,7 +214,10 @@ async function isGitRepository(dirPath) {
   }
 
   try {
-    const { stdout } = await execFileAsync('git', ['-c', 'safe.directory=*', 'rev-parse', '--is-inside-work-tree'], { cwd: dirPath });
+    const { stdout } = await execFileAsync(GIT_BIN, ['-c', 'safe.directory=*', 'rev-parse', '--is-inside-work-tree'], {
+      cwd: dirPath,
+      env: getExecEnv(),
+    });
     return stdout.trim() === 'true';
   } catch (err) {
     console.warn(`isGitRepository check warning on ${dirPath}:`, err.message);
@@ -164,10 +228,14 @@ async function isGitRepository(dirPath) {
 async function runGit(args, cwd) {
   try {
     const safeArgs = ['-c', 'safe.directory=*', ...args];
-    const { stdout, stderr } = await execFileAsync('git', safeArgs, { cwd, maxBuffer: 10 * 1024 * 1024 });
+    const { stdout, stderr } = await execFileAsync(GIT_BIN, safeArgs, {
+      cwd,
+      env: getExecEnv(),
+      maxBuffer: 10 * 1024 * 1024,
+    });
     return { success: true, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (err) {
-    console.error(`runGit [git ${args.join(' ')}] failed:`, err.stderr || err.message);
+    console.error(`runGit [${GIT_BIN} ${args.join(' ')}] failed:`, err.stderr || err.message);
     return {
       success: false,
       stdout: err.stdout ? err.stdout.trim() : '',
@@ -718,8 +786,7 @@ app.post('/api/projects/:name/exec', requireAuth, checkProjectScope, (req, res) 
     cwd: req.projectDir,
     shell: true,
     env: {
-      ...process.env,
-      PATH: process.env.PATH,
+      ...getExecEnv(),
       PROJECT_DIR: req.projectDir,
     },
   });
@@ -913,7 +980,7 @@ wss.on('connection', (ws, request) => {
   const proc = spawn(shell, shellArgs, {
     cwd: projectDir,
     env: {
-      ...process.env,
+      ...getExecEnv(),
       TERM: 'xterm-256color',
       PS1: `\\u@devspace:[${projectName}]$ `,
     },
