@@ -575,6 +575,7 @@ async function loadAiModels() {
       const opt = document.createElement('option');
       opt.value = m.id;
       opt.textContent = m.name;
+      if (m.id === 'sso_codex') opt.selected = true;
       select.appendChild(opt);
     });
   } catch (err) {
@@ -610,7 +611,7 @@ async function sendAiPrompt(promptText) {
   const activeTab = openTabs.find(t => t.path === currentFile);
   const currentContent = monacoEditor ? monacoEditor.getValue() : (activeTab ? activeTab.content : null);
 
-  const selectedModel = document.getElementById('aiModelSelect').value || 'gemini';
+  const selectedModel = document.getElementById('aiModelSelect').value || 'sso_codex';
   const isGemini = selectedModel.toLowerCase().includes('gemini') || selectedModel.toLowerCase().includes('google');
 
   // Construction du prompt contextuel avec consigne de nommage de fichier
@@ -635,22 +636,27 @@ async function sendAiPrompt(promptText) {
         if (credRes.ok) {
           const credData = await credRes.json();
           if (credData.apiKey) {
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${credData.apiKey.trim()}`;
-            const gRes = await fetch(geminiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: contextualPrompt }] }],
-                generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
-              }),
-            });
+            const apiKey = credData.apiKey.trim();
+            const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+            for (const mName of modelsToTry) {
+              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${apiKey}`;
+              const gRes = await fetch(geminiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: contextualPrompt }] }],
+                  generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
+                }),
+              });
 
-            if (gRes.ok) {
-              const gData = await gRes.json();
-              reply = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            } else {
-              const errTxt = await gRes.text().catch(() => '');
-              console.warn('Appel direct Gemini navigateur non concluant:', gRes.status, errTxt);
+              if (gRes.ok) {
+                const gData = await gRes.json();
+                reply = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (reply) break;
+              } else {
+                const errTxt = await gRes.text().catch(() => '');
+                console.warn(`Appel direct Gemini (${mName}) non concluant:`, gRes.status, errTxt);
+              }
             }
           }
         }

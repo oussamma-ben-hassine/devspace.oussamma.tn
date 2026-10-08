@@ -838,19 +838,19 @@ app.get('/api/ai/models', requireAuth, async (req, res) => {
         const providers = await vaultRes.json();
         for (const p of providers) {
           const provName = (p.provider || '').toLowerCase();
-          if (provName === 'gemini' || provName === 'google') {
-            configuredModels.push({
-              id: 'gemini',
-              name: 'Gemini 3.5 Flash',
-              description: 'Google AI Studio',
-              provider: 'gemini',
-            });
-          } else if (provName === 'openai_codex' || provName === 'codex' || provName === 'sso') {
-            configuredModels.push({
+          if (provName === 'openai_codex' || provName === 'codex' || provName === 'sso') {
+            configuredModels.unshift({
               id: 'sso_codex',
-              name: 'OpenAI GPT-4o (Codex SSO)',
+              name: 'GPT-4o (Codex SSO)',
               description: 'Proxy Codex fourni par le SSO',
               provider: 'openai_codex',
+            });
+          } else if (provName === 'gemini' || provName === 'google') {
+            configuredModels.push({
+              id: 'gemini',
+              name: 'Gemini 2.0 Flash',
+              description: 'Google AI Studio',
+              provider: 'gemini',
             });
           } else if (provName === 'openai') {
             configuredModels.push({
@@ -871,7 +871,7 @@ app.get('/api/ai/models', requireAuth, async (req, res) => {
   if (configuredModels.length === 0) {
     configuredModels.push(
       { id: 'sso_codex', name: 'GPT-4o (Codex SSO)', provider: 'openai_codex' },
-      { id: 'gemini', name: 'Gemini 3.5 Flash', provider: 'gemini' }
+      { id: 'gemini', name: 'Gemini 2.0 Flash', provider: 'gemini' }
     );
   }
 
@@ -898,7 +898,7 @@ app.get('/api/gemini/credentials', requireAuth, async (req, res) => {
     }
 
     const data = await ssoRes.json();
-    return res.json({ apiKey: data.token, model: 'gemini-3.5-flash' });
+    return res.json({ apiKey: data.token, model: 'gemini-2.0-flash' });
   } catch (err) {
     console.error('Erreur récupération clé Gemini:', err);
     return res.status(500).json({ error: 'Erreur lors de la récupération de la clé Gemini' });
@@ -924,10 +924,10 @@ app.post('/api/ai/prompt', requireAuth, async (req, res) => {
   }
   contextualPrompt += `Demande du développeur:\n${prompt}\n\nFournis une réponse précise, en markdown avec les blocs de code appropriés.`;
 
-  const selectedModel = String(model || 'gemini').toLowerCase();
+  const selectedModel = String(model || 'sso_codex').toLowerCase();
   const isGemini = selectedModel.includes('gemini') || selectedModel.includes('google');
   const targetProvider = isGemini ? 'gemini' : (selectedModel.includes('codex') ? 'openai_codex' : 'openai');
-  const targetModel = isGemini ? 'gemini-3.5-flash' : 'gpt-4o';
+  const targetModel = isGemini ? 'gemini-2.0-flash' : 'gpt-4o';
 
   try {
     const callSSO = async (prov, mod) => {
@@ -957,6 +957,24 @@ app.post('/api/ai/prompt', requireAuth, async (req, res) => {
         } else if (targetProvider === 'openai_codex') {
           ssoAiRes = await callSSO('openai', targetModel);
         }
+      }
+    }
+
+    // Si Gemini échoue (ex: 424 avec blocage d'IP datacenter chez Google), repli transparent sur OpenAI Codex (GPT-4o)
+    if (!ssoAiRes.ok && (isGemini || ssoAiRes.status === 424)) {
+      console.warn(`Erreur service IA SSO (${ssoAiRes.status}), repli automatique de secours sur OpenAI Codex (GPT-4o)...`);
+      try {
+        const fallbackCodex = await callSSO('openai_codex', 'gpt-4o');
+        if (fallbackCodex.ok) {
+          ssoAiRes = fallbackCodex;
+        } else {
+          const fallbackOpenAi = await callSSO('openai', 'gpt-4o');
+          if (fallbackOpenAi.ok) {
+            ssoAiRes = fallbackOpenAi;
+          }
+        }
+      } catch (fbErr) {
+        console.warn('Fallback Codex failed:', fbErr.message);
       }
     }
 
