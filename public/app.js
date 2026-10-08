@@ -100,6 +100,11 @@ function initMonaco() {
       saveCurrentFile();
     });
 
+    // Redimensionnement automatique fiable sur resize de fenêtre
+    window.addEventListener('resize', () => {
+      if (monacoEditor) monacoEditor.layout();
+    });
+
     // Détection des modifications pour marquer l'onglet dirty
     monacoEditor.onDidChangeModelContent(() => {
       if (!currentFile) return;
@@ -110,6 +115,8 @@ function initMonaco() {
         renderTabs();
       }
     });
+
+    setTimeout(() => { if (monacoEditor) monacoEditor.layout(); }, 100);
   });
 }
 
@@ -484,12 +491,13 @@ async function saveCurrentFile() {
 
 function showEditor() {
   document.getElementById('emptyEditorState').classList.add('hidden');
-  document.getElementById('monacoInstance').classList.remove('hidden');
+  if (monacoEditor) {
+    setTimeout(() => { monacoEditor.layout(); }, 30);
+  }
 }
 
 function showEmptyEditorState() {
   document.getElementById('emptyEditorState').classList.remove('hidden');
-  document.getElementById('monacoInstance').classList.add('hidden');
   document.getElementById('breadcrumbFile').textContent = 'aucun fichier ouvert';
 }
 
@@ -673,11 +681,29 @@ async function sendAiPrompt(promptText) {
       reply = data.reply;
     }
 
-    const formattedReply = renderAiMarkdown(reply, promptText);
+    const { formattedHtml, firstFile } = renderAiMarkdown(reply, promptText);
+
+    // Détection de l'intention de création de fichier
+    const userWantsCreate = /(cr[eé][eè]r|create|ajoute|g[eé]n[eè]re).*?(fichier|file|\.[a-z0-9]+)/i.test(promptText);
+
+    let autoCreatedBanner = '';
+    if (userWantsCreate && firstFile && currentProject) {
+      const ok = await createProjectFile(firstFile.filename, firstFile.code);
+      if (ok) {
+        autoCreatedBanner = `
+          <div class="p-2 mb-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 rounded-md text-emerald-800 dark:text-emerald-200 text-xs flex items-center space-x-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"></i>
+            <span>Fichier <strong>${escapeHtml(firstFile.filename)}</strong> créé avec succès dans le projet et ouvert dans l'éditeur !</span>
+          </div>
+        `;
+      }
+    }
+
     aiBubble.innerHTML = `
       <div class="space-y-2">
+        ${autoCreatedBanner}
         <div class="leading-relaxed">
-          ${formattedReply}
+          ${formattedHtml}
         </div>
       </div>
     `;
@@ -692,8 +718,39 @@ async function sendAiPrompt(promptText) {
   }
 }
 
+// Fonction centrale de création / écriture de fichier dans le projet
+async function createProjectFile(fileName, content) {
+  if (!currentProject) {
+    alert('Veuillez d\'abord sélectionner ou créer un projet.');
+    return false;
+  }
+  if (!fileName || !fileName.trim()) return false;
+
+  try {
+    const res = await fetch(`/api/projects/${encodeURIComponent(currentProject)}/file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: fileName.trim(), content: content || '' }),
+    });
+
+    if (res.ok) {
+      await loadFileTree();
+      await openFile(fileName.trim(), fileName.trim().split('/').pop());
+      await loadGitStatus();
+      return true;
+    } else {
+      const err = await res.json();
+      alert(`Erreur: ${err.error || 'Impossible de créer le fichier'}`);
+      return false;
+    }
+  } catch (e) {
+    alert(`Erreur: ${e.message}`);
+    return false;
+  }
+}
+
 function renderAiMarkdown(text, userPrompt = '') {
-  if (!text) return '';
+  if (!text) return { formattedHtml: '', firstFile: null };
 
   const codeBlocks = [];
   const placeholder = '___CODE_BLOCK_PLACEHOLDER___';
@@ -715,6 +772,8 @@ function renderAiMarkdown(text, userPrompt = '') {
   processed = processed.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
   processed = processed.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded text-[11px] font-mono bg-slate-200 dark:bg-gray-800 text-sky-700 dark:text-sky-300">$1</code>');
   processed = processed.replace(/\n\n/g, '<br><br>');
+
+  let firstFile = null;
 
   // Réinsérer les blocs de code enrichis d'actions directes
   codeBlocks.forEach((item, index) => {
@@ -753,6 +812,10 @@ function renderAiMarkdown(text, userPrompt = '') {
       else suggestedFilename = `fichier.${item.lang || 'txt'}`;
     }
 
+    if (!firstFile) {
+      firstFile = { filename: suggestedFilename, code: item.code };
+    }
+
     const encodedCode = encodeURIComponent(item.code);
     const safeLang = escapeHtml(item.lang || 'code');
     const safeFileName = escapeHtml(suggestedFilename);
@@ -760,12 +823,12 @@ function renderAiMarkdown(text, userPrompt = '') {
     const blockHtml = `
       <div class="ai-code-wrapper my-2.5 rounded-lg border border-slate-300 dark:border-gray-700 overflow-hidden shadow-xs">
         <div class="ai-code-header flex items-center justify-between px-2.5 py-1.5 bg-slate-100 dark:bg-[#1f1f23] border-b border-slate-200 dark:border-gray-700 text-xs">
-          <div class="flex items-center space-x-1.5 truncate">
+          <div class="flex items-center space-x-1.5 truncate max-w-[55%]">
             <span class="font-mono font-bold text-sky-600 dark:text-sky-400 truncate">📄 ${safeFileName}</span>
             <span class="text-[9px] px-1.5 py-0.2 bg-slate-200 dark:bg-gray-800 rounded text-slate-500 dark:text-gray-400 uppercase font-mono">${safeLang}</span>
           </div>
           <div class="flex items-center space-x-1 shrink-0">
-            <button data-code="${encodedCode}" data-filename="${safeFileName}" class="btn-create-ai-file px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-medium flex items-center gap-1 shadow-xs transition" title="Créer ce fichier dans le projet">
+            <button data-code="${encodedCode}" data-filename="${safeFileName}" class="btn-create-ai-file px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-medium flex items-center gap-1 shadow-xs transition" title="Créer directement ce fichier dans le projet">
               <i data-lucide="file-plus-2" class="w-3 h-3"></i>
               <span>Créer fichier</span>
             </button>
@@ -784,50 +847,28 @@ function renderAiMarkdown(text, userPrompt = '') {
     processed = processed.replace(`${placeholder}${index}${placeholder}`, blockHtml);
   });
 
-  return processed;
+  return { formattedHtml: processed, firstFile };
 }
 
 function attachAiCodeEvents(container) {
   // 1. Bouton Créer automatiquement le fichier dans le projet
   container.querySelectorAll('.btn-create-ai-file').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!currentProject) {
-        alert('Veuillez d\'abord sélectionner ou créer un projet.');
-        return;
-      }
-      const defaultName = btn.getAttribute('data-filename') || 'index.html';
-      const fileName = prompt(`Créer ce fichier dans le projet "${currentProject}" :`, defaultName);
-      if (!fileName || !fileName.trim()) return;
-
+      const fileName = btn.getAttribute('data-filename') || 'index.html';
       const code = decodeURIComponent(btn.getAttribute('data-code'));
       btn.disabled = true;
-      btn.innerHTML = 'Création...';
+      btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i><span>Création...</span>';
+      if (window.lucide) lucide.createIcons();
 
-      try {
-        const res = await fetch(`/api/projects/${encodeURIComponent(currentProject)}/file`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: fileName.trim(), content: code }),
-        });
-
-        if (res.ok) {
-          btn.className = btn.className.replace('bg-emerald-600', 'bg-emerald-700');
-          btn.innerHTML = '✓ Fichier créé !';
-          await loadFileTree();
-          await openFile(fileName.trim(), fileName.trim().split('/').pop());
-          await loadGitStatus();
-        } else {
-          const err = await res.json();
-          alert(`Erreur: ${err.error || 'Impossible de créer le fichier'}`);
-          btn.innerHTML = 'Créer fichier';
-        }
-      } catch (e) {
-        alert(`Erreur: ${e.message}`);
-        btn.innerHTML = 'Créer fichier';
-      } finally {
-        btn.disabled = false;
-        if (window.lucide) lucide.createIcons();
+      const ok = await createProjectFile(fileName, code);
+      if (ok) {
+        btn.className = btn.className.replace('bg-emerald-600', 'bg-emerald-700 font-bold');
+        btn.innerHTML = '<i data-lucide="check" class="w-3 h-3"></i><span>✓ Créé & Ouvert !</span>';
+      } else {
+        btn.innerHTML = '<i data-lucide="file-plus-2" class="w-3 h-3"></i><span>Créer fichier</span>';
       }
+      btn.disabled = false;
+      if (window.lucide) lucide.createIcons();
     });
   });
 
@@ -981,6 +1022,9 @@ function initEventListeners() {
       icon.setAttribute('data-lucide', isWide ? 'minimize-2' : 'maximize-2');
       if (window.lucide) lucide.createIcons();
     }
+    if (monacoEditor) {
+      setTimeout(() => monacoEditor.layout(), 160);
+    }
   });
 
   // Switch d'onglets de panneau d'activité (Explorer, Git, AI, Terminal)
@@ -990,11 +1034,21 @@ function initEventListeners() {
       if (panelName === 'terminal') {
         const term = document.getElementById('bottomTerminalPanel');
         term.classList.toggle('hidden');
+        if (monacoEditor) {
+          setTimeout(() => monacoEditor.layout(), 160);
+        }
         return;
       }
 
       document.querySelectorAll('.activity-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+
+      const sidePanel = document.getElementById('sidePanel');
+      if (panelName === 'ai') {
+        sidePanel.classList.add('panel-ai-active');
+      } else {
+        sidePanel.classList.remove('panel-ai-active');
+      }
 
       document.getElementById('panelExplorer').classList.add('hidden');
       document.getElementById('panelGit').classList.add('hidden');
@@ -1007,6 +1061,10 @@ function initEventListeners() {
       }
       if (panelName === 'ai') {
         document.getElementById('panelAi').classList.remove('hidden');
+      }
+
+      if (monacoEditor) {
+        setTimeout(() => monacoEditor.layout(), 160);
       }
 
       // Si on est sur mobile, ouvrir le tiroir
@@ -1209,9 +1267,12 @@ function initEventListeners() {
 
   document.getElementById('btnToggleTerminal').addEventListener('click', () => {
     const term = document.getElementById('bottomTerminalPanel');
-    term.classList.toggle('h-40');
-    term.classList.toggle('sm:h-44');
+    term.classList.toggle('h-36');
+    term.classList.toggle('sm:h-40');
     term.classList.toggle('h-8');
+    if (monacoEditor) {
+      setTimeout(() => { monacoEditor.layout(); }, 160);
+    }
   });
 }
 
