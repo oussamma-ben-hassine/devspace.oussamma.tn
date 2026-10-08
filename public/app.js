@@ -6,9 +6,11 @@ let openTabs = []; // { path, name, content, originalContent, isDirty }
 let wsTerminal = null;
 let activePanel = 'explorer';
 let createProjectType = 'init';
+let currentTheme = localStorage.getItem('devspace_theme') || 'dark';
 
 // Initialisation au chargement
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   if (window.lucide) {
     lucide.createIcons();
   }
@@ -19,6 +21,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadProjects();
   await loadAiModels();
 });
+
+// =============================================================================
+// GESTION DU DOUBLE THÈME (BLANC & NOIR)
+// =============================================================================
+function initTheme() {
+  setTheme(currentTheme);
+}
+
+function setTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem('devspace_theme', theme);
+
+  const html = document.documentElement;
+  const sunIcon = document.getElementById('themeIconSun');
+  const moonIcon = document.getElementById('themeIconMoon');
+
+  if (theme === 'dark') {
+    html.classList.add('dark');
+    if (sunIcon) sunIcon.classList.add('hidden');
+    if (moonIcon) moonIcon.classList.remove('hidden');
+    if (window.monaco && monacoEditor) {
+      monaco.editor.setTheme('vs-dark');
+    }
+  } else {
+    html.classList.remove('dark');
+    if (sunIcon) sunIcon.classList.remove('hidden');
+    if (moonIcon) moonIcon.classList.add('hidden');
+    if (window.monaco && monacoEditor) {
+      monaco.editor.setTheme('vs');
+    }
+  }
+}
 
 // =============================================================================
 // CHARGEMENT UTILISATEUR SSO
@@ -48,10 +82,11 @@ async function loadCurrentUser() {
 function initMonaco() {
   require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
   require(['vs/editor/editor.main'], function () {
+    const isDark = document.documentElement.classList.contains('dark');
     monacoEditor = monaco.editor.create(document.getElementById('monacoInstance'), {
       value: '',
       language: 'javascript',
-      theme: 'vs-dark',
+      theme: isDark ? 'vs-dark' : 'vs',
       fontSize: 13,
       minimap: { enabled: true },
       automaticLayout: true,
@@ -88,6 +123,7 @@ function getLanguageForPath(filePath) {
     case 'ts':
       return 'typescript';
     case 'html':
+    case 'htm':
       return 'html';
     case 'css':
       return 'css';
@@ -127,15 +163,15 @@ async function loadProjects() {
 
     data.projects.forEach(p => {
       const item = document.createElement('div');
-      item.className = 'px-3 py-2 hover:bg-gray-700/40 cursor-pointer flex items-center justify-between transition text-xs';
+      item.className = 'px-3 py-2 hover:bg-slate-100 dark:hover:bg-gray-700/40 cursor-pointer flex items-center justify-between transition text-xs';
       item.innerHTML = `
         <div class="flex items-center space-x-2 truncate">
-          <i data-lucide="${p.isGit ? 'git-branch' : 'alert-circle'}" class="w-3.5 h-3.5 ${p.isGit ? 'text-emerald-400' : 'text-amber-400'} shrink-0"></i>
-          <span class="font-medium text-gray-200 truncate">${escapeHtml(p.name)}</span>
+          <i data-lucide="${p.isGit ? 'git-branch' : 'alert-circle'}" class="w-3.5 h-3.5 ${p.isGit ? 'text-emerald-500' : 'text-amber-500'} shrink-0"></i>
+          <span class="font-medium text-slate-800 dark:text-gray-200 truncate">${escapeHtml(p.name)}</span>
         </div>
         <div class="flex items-center space-x-1 shrink-0">
-          ${p.isGit ? `<span class="text-[10px] px-1 py-0.2 bg-gray-800 text-gray-400 rounded font-mono">${escapeHtml(p.branch || 'main')}</span>` : `<span class="text-[9px] px-1 py-0.2 bg-amber-500/20 text-amber-300 rounded">Non-Git</span>`}
-          ${p.isDirty ? `<span class="w-2 h-2 rounded-full bg-amber-400" title="Changements non commités"></span>` : ''}
+          ${p.isGit ? `<span class="text-[10px] px-1 py-0.2 bg-slate-200 dark:bg-gray-800 text-slate-600 dark:text-gray-400 rounded font-mono">${escapeHtml(p.branch || 'main')}</span>` : `<span class="text-[9px] px-1 py-0.2 bg-amber-500/20 text-amber-600 dark:text-amber-300 rounded">Non-Git</span>`}
+          ${p.isDirty ? `<span class="w-2 h-2 rounded-full bg-amber-500" title="Changements non commités"></span>` : ''}
         </div>
       `;
 
@@ -189,14 +225,14 @@ async function loadFileTree() {
   if (!currentProject) return;
 
   const container = document.getElementById('fileTreeContainer');
-  container.innerHTML = '<div class="text-gray-500 p-2 text-center text-xs">Chargement...</div>';
+  container.innerHTML = '<div class="text-slate-400 dark:text-gray-500 p-2 text-center text-xs">Chargement...</div>';
 
   try {
     const res = await fetch(`/api/projects/${encodeURIComponent(currentProject)}/tree`);
     if (res.status === 403) {
       const err = await res.json();
       container.innerHTML = `
-        <div class="p-3 bg-amber-950/40 border border-amber-800/40 rounded text-amber-200 text-xs space-y-2">
+        <div class="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/40 rounded text-amber-800 dark:text-amber-200 text-xs space-y-2">
           <p><strong>⚠️ Dépôt Git obligatoire :</strong> Ce dossier n'est pas un dépôt Git.</p>
           <button id="btnForceInitGit" class="w-full py-1 bg-amber-600 hover:bg-amber-500 text-white rounded font-medium">Initialiser Git maintenant</button>
         </div>
@@ -213,14 +249,14 @@ async function loadFileTree() {
     container.innerHTML = '';
 
     if (!data.tree || data.tree.length === 0) {
-      container.innerHTML = '<div class="text-gray-500 p-3 text-center text-xs">Projet vide. Créez un fichier pour démarrer.</div>';
+      container.innerHTML = '<div class="text-slate-400 dark:text-gray-500 p-3 text-center text-xs">Projet vide. Créez un fichier pour démarrer.</div>';
       return;
     }
 
     renderTreeNodes(data.tree, container);
     if (window.lucide) lucide.createIcons();
   } catch (err) {
-    container.innerHTML = `<div class="text-rose-400 p-2 text-xs">Erreur: ${escapeHtml(err.message)}</div>`;
+    container.innerHTML = `<div class="text-rose-500 p-2 text-xs">Erreur: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -235,11 +271,11 @@ function renderTreeNodes(nodes, container, level = 0) {
 
     el.innerHTML = `
       <div class="flex items-center space-x-1.5 truncate flex-1">
-        <i data-lucide="${iconName}" class="w-3.5 h-3.5 ${isFolder ? 'text-sky-400' : 'text-gray-400'} shrink-0"></i>
-        <span class="truncate ${node.path === currentFile ? 'text-sky-400 font-semibold' : 'text-gray-300'}">${escapeHtml(node.name)}</span>
+        <i data-lucide="${iconName}" class="w-3.5 h-3.5 ${isFolder ? 'text-sky-500' : 'text-slate-400 dark:text-gray-400'} shrink-0"></i>
+        <span class="truncate ${node.path === currentFile ? 'text-sky-600 dark:text-sky-400 font-semibold' : 'text-slate-700 dark:text-gray-300'}">${escapeHtml(node.name)}</span>
       </div>
       <div class="actions opacity-0 hover:opacity-100 flex items-center space-x-1 shrink-0">
-        <button class="btn-delete-item p-0.5 text-gray-500 hover:text-rose-400" title="Supprimer">
+        <button class="btn-delete-item p-0.5 text-slate-400 hover:text-rose-500" title="Supprimer">
           <i data-lucide="trash-2" class="w-3 h-3"></i>
         </button>
       </div>
@@ -309,6 +345,7 @@ function getFileIcon(name) {
       return 'file-text';
     case 'css':
     case 'html':
+    case 'htm':
       return 'file-code-2';
     default:
       return 'file';
@@ -356,6 +393,9 @@ async function openFile(filePath, fileName) {
 
   document.getElementById('breadcrumbFile').textContent = tab.path;
   document.getElementById('breadcrumbs').classList.remove('hidden');
+
+  // Sur mobile : fermer le tiroir pour afficher le code directement
+  closeMobileSidebar();
 }
 
 function renderTabs() {
@@ -367,8 +407,8 @@ function renderTabs() {
     tabEl.className = `editor-tab ${tab.path === currentFile ? 'active' : ''}`;
     tabEl.innerHTML = `
       <span class="truncate max-w-[140px]">${escapeHtml(tab.name)}</span>
-      ${tab.isDirty ? '<span class="ml-1.5 text-amber-400 font-bold">●</span>' : ''}
-      <button class="ml-2 text-gray-500 hover:text-white p-0.5 rounded close-tab-btn">×</button>
+      ${tab.isDirty ? '<span class="ml-1.5 text-amber-500 font-bold">●</span>' : ''}
+      <button class="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded close-tab-btn">×</button>
     `;
 
     tabEl.addEventListener('click', (e) => {
@@ -474,14 +514,14 @@ async function loadGitStatus() {
     document.getElementById('gitChangesCount').textContent = data.files.length;
 
     if (data.files.length === 0) {
-      filesList.innerHTML = '<div class="text-gray-500 p-2 text-center text-[10px]">Arborescence propre. Aucun changement en attente.</div>';
+      filesList.innerHTML = '<div class="text-slate-400 dark:text-gray-500 p-2 text-center text-[10px]">Arborescence propre. Aucun changement en attente.</div>';
     } else {
       data.files.forEach(f => {
         const row = document.createElement('div');
-        row.className = 'flex items-center justify-between text-[11px] py-0.5 px-1 hover:bg-gray-800 rounded';
+        row.className = 'flex items-center justify-between text-[11px] py-0.5 px-1 hover:bg-slate-200 dark:hover:bg-gray-800 rounded';
         row.innerHTML = `
-          <span class="truncate text-gray-300 font-mono">${escapeHtml(f.path)}</span>
-          <span class="text-[9px] px-1 bg-amber-500/20 text-amber-300 rounded font-mono">${escapeHtml(f.code.trim())}</span>
+          <span class="truncate text-slate-700 dark:text-gray-300 font-mono">${escapeHtml(f.path)}</span>
+          <span class="text-[9px] px-1 bg-amber-500/20 text-amber-600 dark:text-amber-300 rounded font-mono">${escapeHtml(f.code.trim())}</span>
         `;
         filesList.appendChild(row);
       });
@@ -492,17 +532,17 @@ async function loadGitStatus() {
     logContainer.innerHTML = '';
 
     if (!data.commits || data.commits.length === 0) {
-      logContainer.innerHTML = '<div class="text-gray-500 text-[10px]">Aucun commit pour le moment.</div>';
+      logContainer.innerHTML = '<div class="text-slate-400 dark:text-gray-500 text-[10px]">Aucun commit pour le moment.</div>';
     } else {
       data.commits.forEach(c => {
         const item = document.createElement('div');
-        item.className = 'p-1.5 bg-[#16161a] border border-gray-800 rounded';
+        item.className = 'p-1.5 bg-slate-100 dark:bg-[#16161a] border border-slate-200 dark:border-gray-800 rounded';
         item.innerHTML = `
-          <div class="flex items-center justify-between text-gray-400">
-            <span class="text-sky-400 font-bold">${escapeHtml(c.hash)}</span>
+          <div class="flex items-center justify-between text-slate-500 dark:text-gray-400">
+            <span class="text-sky-600 dark:text-sky-400 font-bold">${escapeHtml(c.hash)}</span>
             <span class="text-[9px]">${escapeHtml(c.date)}</span>
           </div>
-          <div class="text-gray-200 mt-0.5 truncate">${escapeHtml(c.message)}</div>
+          <div class="text-slate-800 dark:text-gray-200 mt-0.5 truncate">${escapeHtml(c.message)}</div>
         `;
         logContainer.appendChild(item);
       });
@@ -513,7 +553,7 @@ async function loadGitStatus() {
 }
 
 // =============================================================================
-// ASSISTANT IA (SSO LLM)
+// ASSISTANT IA (SSO LLM) AVEC CRÉATION DE FICHIERS DIRECTE
 // =============================================================================
 async function loadAiModels() {
   try {
@@ -550,9 +590,9 @@ async function sendAiPrompt(promptText) {
   const aiBubble = document.createElement('div');
   aiBubble.className = 'chat-msg-ai';
   aiBubble.innerHTML = `
-    <div class="flex items-center space-x-2 text-sky-400 text-xs">
+    <div class="flex items-center space-x-2 text-sky-600 dark:text-sky-400 text-xs">
       <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
-      <span>L'IA analyse le projet...</span>
+      <span>L'IA analyse et génère le code...</span>
     </div>
   `;
   messagesContainer.appendChild(aiBubble);
@@ -565,7 +605,7 @@ async function sendAiPrompt(promptText) {
   const selectedModel = document.getElementById('aiModelSelect').value || 'gemini';
   const isGemini = selectedModel.toLowerCase().includes('gemini') || selectedModel.toLowerCase().includes('google');
 
-  // Construction du prompt contextuel
+  // Construction du prompt contextuel avec consigne de nommage de fichier
   let contextualPrompt = `Tu es l'assistant de programmation intelligent de DevSpace.\n`;
   contextualPrompt += `Projet actif: ${currentProject || 'inconnu'}\n`;
   if (currentFile) {
@@ -574,7 +614,8 @@ async function sendAiPrompt(promptText) {
       contextualPrompt += `\n--- CONTENU ACTUEL DU FICHIER (${currentFile}) ---\n${currentContent}\n--- FIN DU CONTENU ---\n\n`;
     }
   }
-  contextualPrompt += `Demande du développeur:\n${promptText}\n\nFournis une réponse précise, en markdown avec les blocs de code appropriés.`;
+  contextualPrompt += `Consigne importante: Quand tu génères du code pour un fichier ou que le développeur demande de créer un fichier (ex: index.html, style.css, script.js), indique TOUJOURS son nom précis avant le bloc au format [FICHIER: nom_du_fichier] suivi du bloc de code complet markdown \`\`\`lang ... \`\`\`.\n`;
+  contextualPrompt += `Demande du développeur:\n${promptText}\n\nFournis une réponse claire, complète et directement utilisable.`;
 
   try {
     let reply = '';
@@ -626,59 +667,191 @@ async function sendAiPrompt(promptText) {
 
       const data = await res.json();
       if (!res.ok) {
-        aiBubble.innerHTML = `<p class="text-rose-400">Erreur : ${escapeHtml(data.error || 'Erreur inconnue')}</p>`;
+        aiBubble.innerHTML = `<p class="text-rose-500">Erreur : ${escapeHtml(data.error || 'Erreur inconnue')}</p>`;
         return;
       }
       reply = data.reply;
     }
 
-    const formattedReply = renderAiMarkdown(reply);
+    const formattedReply = renderAiMarkdown(reply, promptText);
     aiBubble.innerHTML = `
       <div class="space-y-2">
-        <div class="prose prose-invert max-w-none text-xs leading-relaxed text-gray-200">
+        <div class="leading-relaxed">
           ${formattedReply}
         </div>
       </div>
     `;
 
-    // Attacher des boutons "Insérer dans l'éditeur" sur les blocs de code
-    aiBubble.querySelectorAll('pre code').forEach(codeBlock => {
-      const btnInsert = document.createElement('button');
-      btnInsert.className = 'text-[10px] bg-sky-600 hover:bg-sky-500 text-white px-2 py-0.5 rounded mt-1 block';
-      btnInsert.textContent = 'Insérer dans l\'éditeur';
-      btnInsert.addEventListener('click', () => {
-        if (monacoEditor) {
-          monacoEditor.trigger('keyboard', 'type', { text: codeBlock.innerText });
-        }
-      });
-      codeBlock.parentElement.appendChild(btnInsert);
-    });
+    // Attacher les gestionnaires d'actions (Créer fichier, Copier, Insérer)
+    attachAiCodeEvents(aiBubble);
 
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (window.lucide) lucide.createIcons();
   } catch (err) {
-    aiBubble.innerHTML = `<p class="text-rose-400">Erreur de communication : ${escapeHtml(err.message)}</p>`;
+    aiBubble.innerHTML = `<p class="text-rose-500">Erreur de communication : ${escapeHtml(err.message)}</p>`;
   }
 }
 
-function renderAiMarkdown(text) {
+function renderAiMarkdown(text, userPrompt = '') {
   if (!text) return '';
-  // Échappement HTML basique et formatage des blocs de code
-  let parsed = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 
-  // Blocs de code ```lang ... ```
-  parsed = parsed.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-    return `<pre class="bg-gray-900 border border-gray-800 p-2 rounded my-1.5 overflow-x-auto text-[11px] font-mono"><code>${code.trim()}</code></pre>`;
+  const codeBlocks = [];
+  const placeholder = '___CODE_BLOCK_PLACEHOLDER___';
+
+  // Extraire les blocs de code
+  let processed = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    const index = codeBlocks.length;
+    codeBlocks.push({ lang: lang.trim() || 'plaintext', code: code.trim() });
+    return `${placeholder}${index}${placeholder}`;
   });
 
-  // Code inline `...`
-  parsed = parsed.replace(/`([^`]+)`/g, '<code class="bg-gray-800 text-sky-300 px-1 py-0.2 rounded font-mono text-[11px]">$1</code>');
+  // Nettoyage et formatage HTML du texte
+  processed = escapeHtml(processed);
 
-  // Paragraphes
-  parsed = parsed.replace(/\n\n/g, '<br><br>');
-  return parsed;
+  processed = processed.replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold my-1 text-sky-600 dark:text-sky-400">$1</h3>');
+  processed = processed.replace(/^## (.*$)/gim, '<h2 class="text-base font-bold my-1.5 text-sky-600 dark:text-sky-400">$1</h2>');
+  processed = processed.replace(/^# (.*$)/gim, '<h1 class="text-lg font-bold my-2 text-sky-600 dark:text-sky-400">$1</h1>');
+  processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>');
+  processed = processed.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+  processed = processed.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded text-[11px] font-mono bg-slate-200 dark:bg-gray-800 text-sky-700 dark:text-sky-300">$1</code>');
+  processed = processed.replace(/\n\n/g, '<br><br>');
+
+  // Réinsérer les blocs de code enrichis d'actions directes
+  codeBlocks.forEach((item, index) => {
+    let suggestedFilename = '';
+
+    // Détection via [FICHIER: xxx]
+    const fileTagMatch = text.match(/\[(?:FICHIER|FILE):\s*([a-zA-Z0-9_\-\.\/]+)\]/i);
+    if (fileTagMatch) {
+      suggestedFilename = fileTagMatch[1].trim();
+    }
+
+    // Détection via commentaire de première ligne
+    if (!suggestedFilename) {
+      const firstLine = item.code.split('\n')[0].trim();
+      const commentMatch = firstLine.match(/^(?:\/\/|<!--|#|\/\*)\s*([a-zA-Z0-9_\-\.]+\.[a-zA-Z0-9]+)/);
+      if (commentMatch) {
+        suggestedFilename = commentMatch[1].trim();
+      }
+    }
+
+    // Détection d'après le prompt utilisateur
+    if (!suggestedFilename && userPrompt) {
+      const promptFileMatch = userPrompt.match(/([a-zA-Z0-9_\-]+\.(html|css|js|ts|py|json|md|sh))/i);
+      if (promptFileMatch) {
+        suggestedFilename = promptFileMatch[1].trim();
+      }
+    }
+
+    // Déduction par défaut d'après le langage
+    if (!suggestedFilename) {
+      if (item.lang === 'html') suggestedFilename = 'index.html';
+      else if (item.lang === 'css') suggestedFilename = 'style.css';
+      else if (item.lang === 'javascript' || item.lang === 'js') suggestedFilename = 'script.js';
+      else if (item.lang === 'python' || item.lang === 'py') suggestedFilename = 'app.py';
+      else if (item.lang === 'json') suggestedFilename = 'data.json';
+      else suggestedFilename = `fichier.${item.lang || 'txt'}`;
+    }
+
+    const encodedCode = encodeURIComponent(item.code);
+    const safeLang = escapeHtml(item.lang || 'code');
+    const safeFileName = escapeHtml(suggestedFilename);
+
+    const blockHtml = `
+      <div class="ai-code-wrapper my-2.5 rounded-lg border border-slate-300 dark:border-gray-700 overflow-hidden shadow-xs">
+        <div class="ai-code-header flex items-center justify-between px-2.5 py-1.5 bg-slate-100 dark:bg-[#1f1f23] border-b border-slate-200 dark:border-gray-700 text-xs">
+          <div class="flex items-center space-x-1.5 truncate">
+            <span class="font-mono font-bold text-sky-600 dark:text-sky-400 truncate">📄 ${safeFileName}</span>
+            <span class="text-[9px] px-1.5 py-0.2 bg-slate-200 dark:bg-gray-800 rounded text-slate-500 dark:text-gray-400 uppercase font-mono">${safeLang}</span>
+          </div>
+          <div class="flex items-center space-x-1 shrink-0">
+            <button data-code="${encodedCode}" data-filename="${safeFileName}" class="btn-create-ai-file px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-medium flex items-center gap-1 shadow-xs transition" title="Créer ce fichier dans le projet">
+              <i data-lucide="file-plus-2" class="w-3 h-3"></i>
+              <span>Créer fichier</span>
+            </button>
+            <button data-code="${encodedCode}" class="btn-copy-ai-code px-2 py-1 bg-slate-200 dark:bg-gray-800 hover:bg-slate-300 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 rounded text-[10px] font-medium transition" title="Copier le code">
+              <span>Copier</span>
+            </button>
+            <button data-code="${encodedCode}" class="btn-insert-ai-code px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-medium transition" title="Insérer dans l'éditeur">
+              <span>Insérer</span>
+            </button>
+          </div>
+        </div>
+        <pre class="ai-code-content p-2.5 overflow-x-auto text-[11px] font-mono whitespace-pre bg-slate-50 dark:bg-[#0d0d11] text-slate-900 dark:text-gray-100"><code>${escapeHtml(item.code)}</code></pre>
+      </div>
+    `;
+
+    processed = processed.replace(`${placeholder}${index}${placeholder}`, blockHtml);
+  });
+
+  return processed;
+}
+
+function attachAiCodeEvents(container) {
+  // 1. Bouton Créer automatiquement le fichier dans le projet
+  container.querySelectorAll('.btn-create-ai-file').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!currentProject) {
+        alert('Veuillez d\'abord sélectionner ou créer un projet.');
+        return;
+      }
+      const defaultName = btn.getAttribute('data-filename') || 'index.html';
+      const fileName = prompt(`Créer ce fichier dans le projet "${currentProject}" :`, defaultName);
+      if (!fileName || !fileName.trim()) return;
+
+      const code = decodeURIComponent(btn.getAttribute('data-code'));
+      btn.disabled = true;
+      btn.innerHTML = 'Création...';
+
+      try {
+        const res = await fetch(`/api/projects/${encodeURIComponent(currentProject)}/file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: fileName.trim(), content: code }),
+        });
+
+        if (res.ok) {
+          btn.className = btn.className.replace('bg-emerald-600', 'bg-emerald-700');
+          btn.innerHTML = '✓ Fichier créé !';
+          await loadFileTree();
+          await openFile(fileName.trim(), fileName.trim().split('/').pop());
+          await loadGitStatus();
+        } else {
+          const err = await res.json();
+          alert(`Erreur: ${err.error || 'Impossible de créer le fichier'}`);
+          btn.innerHTML = 'Créer fichier';
+        }
+      } catch (e) {
+        alert(`Erreur: ${e.message}`);
+        btn.innerHTML = 'Créer fichier';
+      } finally {
+        btn.disabled = false;
+        if (window.lucide) lucide.createIcons();
+      }
+    });
+  });
+
+  // 2. Bouton Copier
+  container.querySelectorAll('.btn-copy-ai-code').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const code = decodeURIComponent(btn.getAttribute('data-code'));
+      await navigator.clipboard.writeText(code);
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ Copié !';
+      setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    });
+  });
+
+  // 3. Bouton Insérer
+  container.querySelectorAll('.btn-insert-ai-code').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = decodeURIComponent(btn.getAttribute('data-code'));
+      if (monacoEditor) {
+        monacoEditor.trigger('keyboard', 'type', { text: code });
+        closeMobileSidebar();
+      }
+    });
+  });
 }
 
 // =============================================================================
@@ -688,9 +861,8 @@ function initProjectTerminal(projectName) {
   const terminalOutput = document.getElementById('terminalOutput');
   terminalOutput.innerHTML = '';
   appendTerminalLine(`=== Terminal initialisé pour [${projectName}] ===`, 'text-sky-400 font-bold');
-  appendTerminalLine(`Les commandes s'exécutent strictement à la racine de ce projet.`, 'text-gray-500');
+  appendTerminalLine(`Les commandes s'exécutent strictement à la racine de ce projet.`, 'text-gray-400');
 
-  // Connexion WebSocket pour streaming interactif
   if (wsTerminal) {
     wsTerminal.close();
   }
@@ -737,13 +909,11 @@ async function executeTerminalCommand(cmd) {
 
   appendTerminalLine(`$ ${cmd}`, 'text-emerald-400 font-bold mt-2');
 
-  // Si WebSocket actif, envoyer dessus
   if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
     wsTerminal.send(JSON.stringify({ type: 'stdin', data: cmd + '\n' }));
     return;
   }
 
-  // Sinon fallback via API HTTP POST /api/projects/:name/exec
   try {
     const res = await fetch(`/api/projects/${encodeURIComponent(currentProject)}/exec`, {
       method: 'POST',
@@ -760,9 +930,59 @@ async function executeTerminalCommand(cmd) {
 }
 
 // =============================================================================
-// ÉVÉNEMENTS & INTERACTIONS UI
+// GESTION DU TIROIR MOBILE & ÉVÉNEMENTS UI
 // =============================================================================
+function openMobileSidebar() {
+  const sidePanel = document.getElementById('sidePanel');
+  const backdrop = document.getElementById('mobileBackdrop');
+  sidePanel.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+}
+
+function closeMobileSidebar() {
+  if (window.innerWidth < 768) {
+    const sidePanel = document.getElementById('sidePanel');
+    const backdrop = document.getElementById('mobileBackdrop');
+    sidePanel.classList.add('hidden');
+    backdrop.classList.add('hidden');
+  }
+}
+
 function initEventListeners() {
+  // Bascule Mode Clair / Sombre
+  document.getElementById('btnToggleTheme').addEventListener('click', () => {
+    setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  });
+
+  // Bouton Burger Mobile
+  document.getElementById('btnToggleMobileSidebar').addEventListener('click', () => {
+    openMobileSidebar();
+  });
+
+  document.getElementById('mobileBackdrop').addEventListener('click', () => {
+    closeMobileSidebar();
+  });
+
+  document.getElementById('btnCloseMobileDrawer')?.addEventListener('click', () => {
+    closeMobileSidebar();
+  });
+
+  document.getElementById('btnCloseMobileDrawerAi')?.addEventListener('click', () => {
+    closeMobileSidebar();
+  });
+
+  // Agrandir / Réduire la barre latérale IA (Wide Mode)
+  document.getElementById('btnToggleAiWide')?.addEventListener('click', () => {
+    const panel = document.getElementById('sidePanel');
+    const icon = document.getElementById('aiWideIcon');
+    panel.classList.toggle('wide-ai-mode');
+    const isWide = panel.classList.contains('wide-ai-mode');
+    if (icon) {
+      icon.setAttribute('data-lucide', isWide ? 'minimize-2' : 'maximize-2');
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
   // Switch d'onglets de panneau d'activité (Explorer, Git, AI, Terminal)
   document.querySelectorAll('.activity-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -785,7 +1005,14 @@ function initEventListeners() {
         document.getElementById('panelGit').classList.remove('hidden');
         loadGitStatus();
       }
-      if (panelName === 'ai') document.getElementById('panelAi').classList.remove('hidden');
+      if (panelName === 'ai') {
+        document.getElementById('panelAi').classList.remove('hidden');
+      }
+
+      // Si on est sur mobile, ouvrir le tiroir
+      if (window.innerWidth < 768) {
+        openMobileSidebar();
+      }
     });
   });
 
@@ -818,16 +1045,16 @@ function initEventListeners() {
 
   initBtn.addEventListener('click', () => {
     createProjectType = 'init';
-    initBtn.className = 'p-2.5 rounded-lg border border-sky-500 bg-sky-500/10 text-white font-medium text-left flex items-center space-x-2';
-    cloneBtn.className = 'p-2.5 rounded-lg border border-gray-700 bg-gray-800/50 text-gray-400 font-medium text-left flex items-center space-x-2 hover:border-gray-600';
+    initBtn.className = 'p-2.5 rounded-lg border border-sky-500 bg-sky-50 dark:bg-sky-500/10 text-sky-800 dark:text-white font-medium text-left flex items-center space-x-2';
+    cloneBtn.className = 'p-2.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-800/50 text-slate-600 dark:text-gray-400 font-medium text-left flex items-center space-x-2 hover:border-slate-400';
     gitUrlCont.classList.add('hidden');
     descCont.classList.remove('hidden');
   });
 
   cloneBtn.addEventListener('click', () => {
     createProjectType = 'clone';
-    cloneBtn.className = 'p-2.5 rounded-lg border border-sky-500 bg-sky-500/10 text-white font-medium text-left flex items-center space-x-2';
-    initBtn.className = 'p-2.5 rounded-lg border border-gray-700 bg-gray-800/50 text-gray-400 font-medium text-left flex items-center space-x-2 hover:border-gray-600';
+    cloneBtn.className = 'p-2.5 rounded-lg border border-sky-500 bg-sky-50 dark:bg-sky-500/10 text-sky-800 dark:text-white font-medium text-left flex items-center space-x-2';
+    initBtn.className = 'p-2.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-800/50 text-slate-600 dark:text-gray-400 font-medium text-left flex items-center space-x-2 hover:border-slate-400';
     gitUrlCont.classList.remove('hidden');
     descCont.classList.add('hidden');
   });
@@ -886,7 +1113,7 @@ function initEventListeners() {
   // Actions de fichiers
   document.getElementById('btnNewFile').addEventListener('click', async () => {
     if (!currentProject) return;
-    const name = prompt('Nom du nouveau fichier (ex: index.js ou src/app.py) :');
+    const name = prompt('Nom du nouveau fichier (ex: index.html ou src/app.py) :');
     if (!name) return;
     await fetch(`/api/projects/${encodeURIComponent(currentProject)}/new-item`, {
       method: 'POST',
@@ -982,7 +1209,8 @@ function initEventListeners() {
 
   document.getElementById('btnToggleTerminal').addEventListener('click', () => {
     const term = document.getElementById('bottomTerminalPanel');
-    term.classList.toggle('h-44');
+    term.classList.toggle('h-40');
+    term.classList.toggle('sm:h-44');
     term.classList.toggle('h-8');
   });
 }

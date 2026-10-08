@@ -2,11 +2,11 @@
 <html lang="fr" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DevSpace — Espace de Développement Personnel</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m18 16 4-4-4-4'/><path d='m6 8-4 4 4 4'/><path d='m14.5 4-5 16'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230ea5e9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m18 16 4-4-4-4'/><path d='m6 8-4 4 4 4'/><path d='m14.5 4-5 16'/></svg>">
   
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS CDN avec configuration du mode sombre -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -20,14 +20,6 @@
               500: '#0ea5e9',
               600: '#0284c7',
               700: '#0369a1',
-            },
-            editor: {
-              bg: '#1e1e1e',
-              sidebar: '#252526',
-              activity: '#333333',
-              border: '#3c3c3c',
-              tab: '#2d2d2d',
-              tabActive: '#1e1e1e',
             }
           }
         }
@@ -43,39 +35,44 @@
 
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-[#18181b] text-gray-200 h-screen flex flex-col overflow-hidden font-sans select-none">
+<body class="bg-slate-100 dark:bg-[#18181b] text-slate-800 dark:text-gray-200 h-screen flex flex-col overflow-hidden font-sans select-none transition-colors duration-200">
 
-  <!-- TOP HEADER / NAV -->
-  <header class="h-12 bg-[#1f1f23] border-b border-[#2e2e33] flex items-center justify-between px-3 z-30 shrink-0">
-    <!-- Left: Brand & Project Selector -->
-    <div class="flex items-center space-x-3">
-      <div class="flex items-center space-x-2 text-sky-400 font-semibold tracking-wide">
+  <!-- TOP HEADER / NAV (RESPONSIVE) -->
+  <header class="h-12 bg-white dark:bg-[#1f1f23] border-b border-slate-200 dark:border-[#2e2e33] flex items-center justify-between px-2 sm:px-3 z-30 shrink-0 transition-colors">
+    <!-- Left: Mobile Menu Toggle + Brand + Project Selector -->
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <!-- Mobile Sidebar Toggle -->
+      <button id="btnToggleMobileSidebar" class="md:hidden p-1.5 text-slate-600 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-gray-800 rounded-lg">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center space-x-2 text-sky-600 dark:text-sky-400 font-semibold tracking-wide">
         <i data-lucide="code-xml" class="w-5 h-5"></i>
-        <span class="text-white font-bold text-sm">Dev<span class="text-sky-400">Space</span></span>
+        <span class="text-slate-900 dark:text-white font-bold text-sm">Dev<span class="text-sky-600 dark:text-sky-400">Space</span></span>
       </div>
 
-      <div class="h-5 w-[1px] bg-gray-700"></div>
+      <div class="hidden sm:block h-5 w-[1px] bg-slate-300 dark:bg-gray-700"></div>
 
       <!-- Project Picker Dropdown -->
       <div class="relative">
-        <button id="projectDropdownBtn" class="flex items-center space-x-2 bg-[#2a2a2e] hover:bg-[#34343a] text-gray-200 px-3 py-1.5 rounded-md text-xs font-medium border border-gray-700 transition">
-          <i data-lucide="folder-git-2" class="w-4 h-4 text-emerald-400"></i>
-          <span id="activeProjectName">Sélectionner un projet...</span>
-          <span id="activeProjectBadge" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">main</span>
-          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+        <button id="projectDropdownBtn" class="flex items-center space-x-1.5 sm:space-x-2 bg-slate-100 dark:bg-[#2a2a2e] hover:bg-slate-200 dark:hover:bg-[#34343a] text-slate-800 dark:text-gray-200 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium border border-slate-300 dark:border-gray-700 transition">
+          <i data-lucide="folder-git-2" class="w-4 h-4 text-emerald-500 dark:text-emerald-400"></i>
+          <span id="activeProjectName" class="max-w-[100px] sm:max-w-[150px] truncate">Sélectionner...</span>
+          <span id="activeProjectBadge" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-mono">main</span>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
         </button>
 
-        <div id="projectDropdownMenu" class="hidden absolute top-full left-0 mt-1 w-64 bg-[#222226] border border-gray-700 rounded-lg shadow-2xl py-1 z-50">
-          <div class="px-3 py-1.5 text-[11px] font-semibold text-gray-400 border-b border-gray-700/60 flex justify-between items-center">
+        <div id="projectDropdownMenu" class="hidden absolute top-full left-0 mt-1 w-64 bg-white dark:bg-[#222226] border border-slate-200 dark:border-gray-700 rounded-lg shadow-2xl py-1 z-50">
+          <div class="px-3 py-1.5 text-[11px] font-semibold text-slate-500 dark:text-gray-400 border-b border-slate-200 dark:border-gray-700/60 flex justify-between items-center">
             <span>PROJETS DU WORKSPACE</span>
-            <span class="text-[10px] text-amber-400 font-mono flex items-center gap-1">
-              <i data-lucide="git-branch" class="w-3 h-3"></i> Git obligatoire
+            <span class="text-[10px] text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1">
+              <i data-lucide="git-branch" class="w-3 h-3"></i> Git requis
             </span>
           </div>
           <div id="projectListContainer" class="max-h-60 overflow-y-auto py-1">
             <!-- Injected via JS -->
           </div>
-          <div class="border-t border-gray-700/60 p-1.5">
+          <div class="border-t border-slate-200 dark:border-gray-700/60 p-1.5">
             <button id="btnOpenNewProjectModal" class="w-full flex items-center justify-center space-x-2 py-1.5 px-3 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-medium transition">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span>Nouveau Projet (Git)</span>
@@ -85,96 +82,111 @@
       </div>
     </div>
 
-    <!-- Center: File breadcrumb & notification -->
-    <div id="breadcrumbs" class="hidden md:flex items-center space-x-1.5 text-xs text-gray-400 font-mono">
-      <span id="breadcrumbProject" class="text-sky-300">workspace</span>
+    <!-- Center: File breadcrumb & notification (desktop only) -->
+    <div id="breadcrumbs" class="hidden lg:flex items-center space-x-1.5 text-xs text-slate-500 dark:text-gray-400 font-mono truncate max-w-sm">
+      <span id="breadcrumbProject" class="text-sky-600 dark:text-sky-300">workspace</span>
       <span>/</span>
-      <span id="breadcrumbFile" class="text-gray-200">aucun fichier ouvert</span>
+      <span id="breadcrumbFile" class="text-slate-800 dark:text-gray-200 truncate">aucun fichier</span>
     </div>
 
-    <!-- Right: SSO User & Status -->
-    <div class="flex items-center space-x-3">
-      <div id="saveStatus" class="text-xs text-emerald-400 flex items-center space-x-1 opacity-0 transition-opacity">
+    <!-- Right: Theme Switcher + Status + SSO User -->
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <!-- Save notification -->
+      <div id="saveStatus" class="hidden sm:flex text-xs text-emerald-500 items-center space-x-1 opacity-0 transition-opacity">
         <i data-lucide="check" class="w-3.5 h-3.5"></i>
         <span>Enregistré</span>
       </div>
 
-      <div class="flex items-center space-x-2 bg-[#2a2a2e] px-2.5 py-1 rounded-full border border-gray-700 text-xs">
+      <!-- THEME SWITCHER (BLANC & NOIR) -->
+      <button id="btnToggleTheme" class="p-1.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-[#2a2a2e] text-slate-700 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-gray-800 transition" title="Basculer Mode Clair / Sombre">
+        <i id="themeIconSun" data-lucide="sun" class="w-4 h-4 hidden"></i>
+        <i id="themeIconMoon" data-lucide="moon" class="w-4 h-4"></i>
+      </button>
+
+      <!-- SSO User Badge -->
+      <div class="flex items-center space-x-2 bg-slate-100 dark:bg-[#2a2a2e] px-2 py-1 rounded-full border border-slate-200 dark:border-gray-700 text-xs">
         <div id="userAvatar" class="w-5 h-5 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center text-[10px] text-white font-bold uppercase">
           U
         </div>
-        <span id="userName" class="text-gray-200 max-w-[120px] truncate">Utilisateur</span>
-        <span class="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-semibold">SSO Actif</span>
+        <span id="userName" class="hidden sm:inline-block text-slate-800 dark:text-gray-200 max-w-[100px] truncate">Utilisateur</span>
       </div>
 
-      <a href="/auth/logout" title="Se déconnecter" class="text-gray-400 hover:text-rose-400 p-1.5 rounded transition">
+      <a href="/auth/logout" title="Se déconnecter" class="text-slate-400 hover:text-rose-500 p-1.5 rounded transition">
         <i data-lucide="log-out" class="w-4 h-4"></i>
       </a>
     </div>
   </header>
 
   <!-- MAIN IDE WORKSPACE BODY -->
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Mobile Overlay Backdrop -->
+    <div id="mobileBackdrop" class="hidden fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-xs"></div>
 
     <!-- 1. LEFT ACTIVITY BAR (ICONS) -->
-    <div class="w-12 bg-[#18181b] border-r border-[#27272a] flex flex-col items-center py-2 space-y-4 shrink-0 z-20">
-      <button data-panel="explorer" class="activity-btn active text-sky-400 hover:text-white p-2.5 rounded-lg transition" title="Explorateur de fichiers">
+    <div class="w-12 bg-white dark:bg-[#18181b] border-r border-slate-200 dark:border-[#27272a] flex flex-col items-center py-2 space-y-4 shrink-0 z-30 transition-colors">
+      <button data-panel="explorer" class="activity-btn active text-sky-600 dark:text-sky-400 hover:text-sky-500 p-2.5 rounded-lg transition" title="Explorateur de fichiers">
         <i data-lucide="files" class="w-5 h-5"></i>
       </button>
-      <button data-panel="git" class="activity-btn text-gray-400 hover:text-white p-2.5 rounded-lg transition" title="Dépôt Git & Historique">
+      <button data-panel="git" class="activity-btn text-slate-400 dark:text-gray-400 hover:text-slate-600 dark:hover:text-white p-2.5 rounded-lg transition" title="Dépôt Git & Historique">
         <i data-lucide="git-pull-request" class="w-5 h-5"></i>
       </button>
-      <button data-panel="ai" class="activity-btn text-gray-400 hover:text-white p-2.5 rounded-lg transition" title="Assistant IA (SSO LLM)">
+      <button data-panel="ai" class="activity-btn text-slate-400 dark:text-gray-400 hover:text-slate-600 dark:hover:text-white p-2.5 rounded-lg transition" title="Assistant IA (SSO LLM)">
         <i data-lucide="sparkles" class="w-5 h-5"></i>
       </button>
-      <button data-panel="terminal" class="activity-btn text-gray-400 hover:text-white p-2.5 rounded-lg transition" title="Terminal & Console">
+      <button data-panel="terminal" class="activity-btn text-slate-400 dark:text-gray-400 hover:text-slate-600 dark:hover:text-white p-2.5 rounded-lg transition" title="Terminal & Console">
         <i data-lucide="terminal" class="w-5 h-5"></i>
       </button>
     </div>
 
-    <!-- 2. SIDEBAR PANEL (FILES / GIT / AI) -->
-    <aside id="sidePanel" class="w-72 bg-[#1e1e24] border-r border-[#2e2e33] flex flex-col shrink-0 overflow-hidden">
+    <!-- 2. SIDEBAR PANEL (FILES / GIT / AI) - RESPONSIVE & WIDER/RESIZABLE -->
+    <aside id="sidePanel" class="hidden md:flex fixed md:static inset-y-0 left-12 md:left-0 z-40 w-full sm:w-96 md:w-[460px] bg-white dark:bg-[#1e1e24] border-r border-slate-200 dark:border-[#2e2e33] flex-col shrink-0 overflow-hidden shadow-2xl md:shadow-none transition-all">
       
       <!-- EXPLORER PANEL -->
-      <div id="panelExplorer" class="flex-1 flex flex-col">
-        <div class="h-9 px-3 border-b border-[#2e2e33] flex items-center justify-between text-xs font-semibold text-gray-400">
-          <span class="tracking-wider text-[11px] uppercase">Explorateur (Projet Isolé)</span>
+      <div id="panelExplorer" class="flex-1 flex flex-col h-full">
+        <div class="h-10 px-3 border-b border-slate-200 dark:border-[#2e2e33] flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-50 dark:bg-[#1a1a20]">
+          <span class="tracking-wider text-[11px] uppercase font-bold flex items-center gap-1.5">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-sky-500"></i> Explorateur
+          </span>
           <div class="flex items-center space-x-1">
-            <button id="btnNewFile" title="Nouveau fichier" class="p-1 hover:text-white rounded hover:bg-gray-700/50">
-              <i data-lucide="file-plus" class="w-3.5 h-3.5"></i>
+            <button id="btnNewFile" title="Nouveau fichier" class="p-1.5 hover:text-sky-600 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-gray-700/50">
+              <i data-lucide="file-plus" class="w-4 h-4"></i>
             </button>
-            <button id="btnNewFolder" title="Nouveau dossier" class="p-1 hover:text-white rounded hover:bg-gray-700/50">
-              <i data-lucide="folder-plus" class="w-3.5 h-3.5"></i>
+            <button id="btnNewFolder" title="Nouveau dossier" class="p-1.5 hover:text-sky-600 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-gray-700/50">
+              <i data-lucide="folder-plus" class="w-4 h-4"></i>
             </button>
-            <button id="btnRefreshFiles" title="Actualiser" class="p-1 hover:text-white rounded hover:bg-gray-700/50">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <button id="btnRefreshFiles" title="Actualiser" class="p-1.5 hover:text-sky-600 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-gray-700/50">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+            <button id="btnCloseMobileDrawer" class="md:hidden p-1.5 text-slate-400 hover:text-rose-500">
+              <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
 
         <div id="fileTreeContainer" class="flex-1 overflow-y-auto p-2 text-xs">
           <!-- Tree rendered by JS -->
-          <div class="text-gray-500 p-4 text-center">Aucun projet sélectionné.</div>
+          <div class="text-slate-400 dark:text-gray-500 p-4 text-center">Aucun projet sélectionné.</div>
         </div>
       </div>
 
       <!-- GIT PANEL -->
-      <div id="panelGit" class="hidden flex-1 flex flex-col">
-        <div class="h-9 px-3 border-b border-[#2e2e33] flex items-center justify-between text-xs font-semibold text-gray-400">
-          <span class="tracking-wider text-[11px] uppercase flex items-center gap-1.5">
-            <i data-lucide="git-branch" class="w-3.5 h-3.5 text-emerald-400"></i> Contrôle de Version
+      <div id="panelGit" class="hidden flex-1 flex flex-col h-full">
+        <div class="h-10 px-3 border-b border-slate-200 dark:border-[#2e2e33] flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-50 dark:bg-[#1a1a20]">
+          <span class="tracking-wider text-[11px] uppercase font-bold flex items-center gap-1.5">
+            <i data-lucide="git-branch" class="w-4 h-4 text-emerald-500"></i> Contrôle de Version
           </span>
-          <button id="btnRefreshGit" title="Actualiser Git" class="p-1 hover:text-white rounded hover:bg-gray-700/50">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <button id="btnRefreshGit" title="Actualiser Git" class="p-1.5 hover:text-sky-600 dark:hover:text-white rounded hover:bg-slate-200 dark:hover:bg-gray-700/50">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
           </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
           <!-- Commit Input Form -->
           <div class="space-y-2">
-            <label class="text-[11px] text-gray-400 font-medium">Message de commit</label>
-            <textarea id="commitMessage" rows="2" placeholder="feat: description des modifications..." class="w-full bg-[#16161a] border border-gray-700 rounded p-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-sky-500"></textarea>
-            <button id="btnCommit" class="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium transition flex items-center justify-center space-x-1.5">
+            <label class="text-[11px] text-slate-500 dark:text-gray-400 font-medium">Message de commit</label>
+            <textarea id="commitMessage" rows="2" placeholder="feat: description des modifications..." class="w-full bg-slate-50 dark:bg-[#16161a] border border-slate-200 dark:border-gray-700 rounded p-2 text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-sky-500"></textarea>
+            <button id="btnCommit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium transition flex items-center justify-center space-x-1.5 shadow">
               <i data-lucide="check" class="w-4 h-4"></i>
               <span>Valider & Commiter</span>
             </button>
@@ -182,18 +194,18 @@
 
           <!-- Changed files list -->
           <div>
-            <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 flex justify-between">
+            <div class="text-[11px] font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 flex justify-between">
               <span>Changements</span>
-              <span id="gitChangesCount" class="text-sky-400 font-mono">0</span>
+              <span id="gitChangesCount" class="text-sky-600 dark:text-sky-400 font-mono font-bold">0</span>
             </div>
-            <div id="gitFilesList" class="space-y-1 bg-[#16161a] border border-gray-700/50 rounded p-1.5 min-h-[60px] max-h-48 overflow-y-auto">
+            <div id="gitFilesList" class="space-y-1 bg-slate-50 dark:bg-[#16161a] border border-slate-200 dark:border-gray-700/50 rounded p-1.5 min-h-[60px] max-h-48 overflow-y-auto">
               <!-- Rendered by JS -->
             </div>
           </div>
 
           <!-- Commit History Log -->
           <div>
-            <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+            <div class="text-[11px] font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
               Derniers Commits
             </div>
             <div id="gitCommitLog" class="space-y-1.5 font-mono text-[11px]">
@@ -203,36 +215,47 @@
         </div>
       </div>
 
-      <!-- AI ASSISTANT PANEL (CONNECTED TO SSO LLM) -->
-      <div id="panelAi" class="hidden flex-1 flex flex-col">
-        <div class="h-9 px-3 border-b border-[#2e2e33] flex items-center justify-between text-xs font-semibold text-gray-400">
-          <span class="tracking-wider text-[11px] uppercase flex items-center gap-1.5 text-sky-400">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Copilot IA (SSO)
+      <!-- AI ASSISTANT PANEL (CONNECTED TO SSO LLM) - EXPANDABLE / WIDE VIEW -->
+      <div id="panelAi" class="hidden flex-1 flex flex-col h-full">
+        <div class="h-10 px-3 border-b border-slate-200 dark:border-[#2e2e33] flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-gray-400 bg-slate-50 dark:bg-[#1a1a20]">
+          <span class="tracking-wider text-[11px] uppercase font-bold flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> Copilot IA (SSO)
           </span>
-          <select id="aiModelSelect" class="bg-[#16161a] text-gray-300 text-[10px] border border-gray-700 rounded px-1.5 py-0.5 focus:outline-none">
-            <option value="gpt-4o">GPT-4o (Codex SSO)</option>
-            <option value="gemini">Gemini 3.5 Flash</option>
-          </select>
+          <div class="flex items-center space-x-1.5">
+            <select id="aiModelSelect" class="bg-white dark:bg-[#16161a] text-slate-800 dark:text-gray-300 text-[10px] border border-slate-300 dark:border-gray-700 rounded px-2 py-1 focus:outline-none">
+              <option value="gemini">Gemini 3.5 Flash</option>
+              <option value="sso_codex">GPT-4o (Codex SSO)</option>
+            </select>
+            <!-- Toggle Wide Mode for AI -->
+            <button id="btnToggleAiWide" class="hidden md:flex p-1 hover:bg-slate-200 dark:hover:bg-gray-700 rounded text-slate-500 dark:text-gray-400" title="Agrandir / Réduire la barre IA">
+              <i id="aiWideIcon" data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+            </button>
+            <button id="btnCloseMobileDrawerAi" class="md:hidden p-1.5 text-slate-400 hover:text-rose-500">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
         </div>
 
-        <div id="aiChatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
-          <div class="p-3 bg-sky-950/30 border border-sky-800/40 rounded-lg text-sky-200 text-xs">
-            👋 <strong>Bonjour !</strong> Je suis votre assistant de développement connecté directement à votre SSO. Je peux générer, analyser ou refactorer du code pour le projet actif.
+        <!-- Chat messages container with smooth wrapping -->
+        <div id="aiChatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs leading-relaxed">
+          <div class="p-3 bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/40 rounded-lg text-sky-800 dark:text-sky-200 text-xs">
+            👋 <strong>Bonjour !</strong> Je suis votre assistant connecté à votre SSO. Vous pouvez me demander de concevoir du code ou de créer directement des fichiers dans le projet actif !
           </div>
         </div>
 
         <!-- Quick AI action buttons -->
-        <div class="px-3 py-1.5 border-t border-[#2e2e33] flex flex-wrap gap-1">
-          <button data-prompt="Explique le code de ce fichier de manière concise." class="quick-ai-btn text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 rounded border border-gray-700">Expliquer</button>
-          <button data-prompt="Génère des tests unitaires complets pour ce fichier." class="quick-ai-btn text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 rounded border border-gray-700">Tests unitaires</button>
-          <button data-prompt="Refactore ce fichier pour améliorer sa propreté, sa maintenabilité et ses performances." class="quick-ai-btn text-[10px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 rounded border border-gray-700">Refactorer</button>
+        <div class="px-3 py-1.5 border-t border-slate-200 dark:border-[#2e2e33] flex flex-wrap gap-1 bg-slate-50 dark:bg-[#1a1a20]">
+          <button data-prompt="Crée une page d'accueil HTML complète et moderne (index.html)" class="quick-ai-btn text-[10px] bg-sky-100 dark:bg-sky-900/40 hover:bg-sky-200 text-sky-800 dark:text-sky-200 px-2 py-1 rounded border border-sky-300 dark:border-sky-700/50 font-medium">📄 Créer index.html</button>
+          <button data-prompt="Explique le code de ce fichier de manière concise." class="quick-ai-btn text-[10px] bg-slate-200 dark:bg-gray-800 hover:bg-slate-300 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 px-2 py-1 rounded border border-slate-300 dark:border-gray-700">Expliquer</button>
+          <button data-prompt="Génère des tests unitaires complets pour ce fichier." class="quick-ai-btn text-[10px] bg-slate-200 dark:bg-gray-800 hover:bg-slate-300 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 px-2 py-1 rounded border border-slate-300 dark:border-gray-700">Tests unitaires</button>
+          <button data-prompt="Refactore ce fichier pour améliorer sa propreté et sa sécurité." class="quick-ai-btn text-[10px] bg-slate-200 dark:bg-gray-800 hover:bg-slate-300 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 px-2 py-1 rounded border border-slate-300 dark:border-gray-700">Refactorer</button>
         </div>
 
         <!-- AI Prompt Input -->
-        <div class="p-2 border-t border-[#2e2e33] bg-[#1a1a1e]">
+        <div class="p-2.5 border-t border-slate-200 dark:border-[#2e2e33] bg-white dark:bg-[#1a1a1e]">
           <div class="relative">
-            <textarea id="aiPromptInput" rows="2" placeholder="Poser une question ou demander du code..." class="w-full bg-[#141417] border border-gray-700 rounded-lg p-2 pr-9 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-sky-500"></textarea>
-            <button id="btnSendAi" class="absolute right-2 bottom-2 text-sky-400 hover:text-sky-300 p-1">
+            <textarea id="aiPromptInput" rows="2" placeholder="Demander du code ou ordonner de créer un fichier..." class="w-full bg-slate-50 dark:bg-[#141417] border border-slate-300 dark:border-gray-700 rounded-lg p-2 pr-10 text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-sky-500 resize-none"></textarea>
+            <button id="btnSendAi" class="absolute right-2.5 bottom-3 text-sky-600 dark:text-sky-400 hover:text-sky-500 p-1" title="Envoyer">
               <i data-lucide="send" class="w-4 h-4"></i>
             </button>
           </div>
@@ -242,49 +265,49 @@
     </aside>
 
     <!-- 3. CENTER EDITOR & TERMINAL WORKSPACE -->
-    <div class="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
+    <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#1e1e1e] transition-colors">
 
-      <!-- OPEN TABS BAR -->
-      <div id="tabsBar" class="h-9 bg-[#18181b] border-b border-[#2e2e33] flex items-center overflow-x-auto select-none shrink-0">
+      <!-- OPEN TABS BAR (HORIZONTAL SCROLL ON MOBILE) -->
+      <div id="tabsBar" class="h-9 bg-slate-100 dark:bg-[#18181b] border-b border-slate-200 dark:border-[#2e2e33] flex items-center overflow-x-auto select-none shrink-0 transition-colors">
         <!-- Rendered by JS -->
       </div>
 
       <!-- MONACO EDITOR CONTAINER -->
       <div id="editorContainer" class="flex-1 w-full h-full relative">
-        <div id="emptyEditorState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 space-y-3">
-          <i data-lucide="code-xml" class="w-12 h-12 text-gray-600"></i>
-          <p class="text-sm">Sélectionnez ou créez un fichier pour commencer à coder.</p>
-          <div class="text-xs text-gray-600 font-mono">
-            Raccourci : <kbd class="px-1.5 py-0.5 bg-gray-800 rounded border border-gray-700 text-gray-400">Ctrl + S</kbd> pour sauvegarder
+        <div id="emptyEditorState" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-gray-500 space-y-3 p-4 text-center">
+          <i data-lucide="code-xml" class="w-12 h-12 text-slate-300 dark:text-gray-600"></i>
+          <p class="text-sm font-medium">Sélectionnez un fichier ou demandez à l'IA d'en créer un.</p>
+          <div class="text-xs text-slate-500 dark:text-gray-500 font-mono">
+            Raccourci : <kbd class="px-1.5 py-0.5 bg-slate-200 dark:bg-gray-800 rounded border border-slate-300 dark:border-gray-700 text-slate-600 dark:text-gray-400 font-semibold">Ctrl + S</kbd> pour sauvegarder
           </div>
         </div>
         <div id="monacoInstance" class="w-full h-full hidden"></div>
       </div>
 
-      <!-- BOTTOM PANEL (TERMINAL / CONSOLE) -->
-      <div id="bottomTerminalPanel" class="h-44 bg-[#141416] border-t border-[#2e2e33] flex flex-col shrink-0 transition-all">
-        <div class="h-8 bg-[#1a1a1e] px-3 flex items-center justify-between border-b border-[#2e2e33] text-xs">
-          <div class="flex items-center space-x-2 text-gray-300 font-medium">
+      <!-- BOTTOM PANEL (TERMINAL / CONSOLE) - RESPONSIVE -->
+      <div id="bottomTerminalPanel" class="h-40 sm:h-44 bg-slate-900 dark:bg-[#141416] border-t border-slate-700 dark:border-[#2e2e33] flex flex-col shrink-0 transition-all text-white">
+        <div class="h-8 bg-slate-800 dark:bg-[#1a1a1e] px-3 flex items-center justify-between border-b border-slate-700 dark:border-[#2e2e33] text-xs">
+          <div class="flex items-center space-x-2 font-medium">
             <i data-lucide="terminal" class="w-3.5 h-3.5 text-sky-400"></i>
-            <span class="text-[11px] font-semibold uppercase">Terminal du projet</span>
-            <span id="terminalProjectName" class="text-[10px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-mono"></span>
+            <span class="text-[11px] font-semibold uppercase tracking-wider">Terminal</span>
+            <span id="terminalProjectName" class="text-[10px] bg-slate-700 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-300 font-mono"></span>
           </div>
           <div class="flex items-center space-x-2">
-            <button id="btnClearTerminal" class="text-gray-400 hover:text-white text-[11px] px-1.5 py-0.5 rounded hover:bg-gray-800">Effacer</button>
-            <button id="btnToggleTerminal" class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800">
+            <button id="btnClearTerminal" class="text-gray-400 hover:text-white text-[11px] px-1.5 py-0.5 rounded hover:bg-slate-700 dark:hover:bg-gray-800">Effacer</button>
+            <button id="btnToggleTerminal" class="text-gray-400 hover:text-white p-1 rounded hover:bg-slate-700 dark:hover:bg-gray-800">
               <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
             </button>
           </div>
         </div>
 
-        <div id="terminalOutput" class="flex-1 p-2 font-mono text-xs text-gray-300 overflow-y-auto whitespace-pre-wrap select-text">
-          <div class="text-gray-500">Prêt. Les commandes s'exécutent strictement à l'intérieur du dossier du projet actif.</div>
+        <div id="terminalOutput" class="flex-1 p-2 font-mono text-xs text-gray-200 overflow-y-auto whitespace-pre-wrap select-text">
+          <div class="text-gray-400">Prêt. Les commandes s'exécutent strictement à l'intérieur du dossier du projet.</div>
         </div>
 
         <!-- Terminal Command Input -->
-        <div class="h-8 bg-[#18181b] border-t border-gray-800 flex items-center px-2">
+        <div class="h-8 bg-slate-950 dark:bg-[#18181b] border-t border-slate-800 dark:border-gray-800 flex items-center px-2">
           <span class="text-sky-400 font-mono text-xs mr-2 font-bold">$</span>
-          <input type="text" id="terminalInput" placeholder="Ex: npm install, git status, ls -la..." class="flex-1 bg-transparent text-xs font-mono text-white focus:outline-none placeholder-gray-600">
+          <input type="text" id="terminalInput" placeholder="Ex: npm install, git status, ls -la..." class="flex-1 bg-transparent text-xs font-mono text-white focus:outline-none placeholder-gray-500">
         </div>
       </div>
 
@@ -293,37 +316,37 @@
   </div>
 
   <!-- MODAL: NOUVEAU PROJET (GIT OBLIGATOIRE) -->
-  <div id="newProjectModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-[#1f1f23] border border-gray-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i data-lucide="folder-git-2" class="w-4 h-4 text-emerald-400"></i>
+  <div id="newProjectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#1f1f23] border border-slate-200 dark:border-gray-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden transition-colors">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-gray-700 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <i data-lucide="folder-git-2" class="w-4 h-4 text-emerald-500"></i>
           Nouveau Projet DevSpace
         </h3>
-        <button id="btnCloseProjectModal" class="text-gray-400 hover:text-white">
+        <button id="btnCloseProjectModal" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
       <div class="p-4 space-y-4 text-xs">
         <!-- Warning alert: Git obligatoire -->
-        <div class="p-2.5 bg-emerald-950/40 border border-emerald-800/50 rounded-lg text-emerald-300 flex items-start space-x-2">
-          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
+        <div class="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-emerald-800 dark:text-emerald-300 flex items-start space-x-2">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5"></i>
           <div>
-            <strong>Isolation stricte & Git obligatoire</strong> : Chaque projet est confiné dans son sous-dossier et initialisé obligatoirement sous Git.
+            <strong>Isolation stricte & Git obligatoire</strong> : Chaque projet est confiné dans son sous-dossier et initialisé sous Git.
           </div>
         </div>
 
         <!-- Type Selector -->
         <div>
-          <label class="block text-gray-400 font-medium mb-1.5">Méthode de création</label>
+          <label class="block text-slate-600 dark:text-gray-400 font-medium mb-1.5">Méthode de création</label>
           <div class="grid grid-cols-2 gap-2">
-            <button id="typeInitBtn" class="p-2.5 rounded-lg border border-sky-500 bg-sky-500/10 text-white font-medium text-left flex items-center space-x-2">
-              <i data-lucide="plus-circle" class="w-4 h-4 text-sky-400"></i>
+            <button id="typeInitBtn" class="p-2.5 rounded-lg border border-sky-500 bg-sky-50 dark:bg-sky-500/10 text-sky-800 dark:text-white font-medium text-left flex items-center space-x-2">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
               <span>Initialiser (git init)</span>
             </button>
-            <button id="typeCloneBtn" class="p-2.5 rounded-lg border border-gray-700 bg-gray-800/50 text-gray-400 font-medium text-left flex items-center space-x-2 hover:border-gray-600">
-              <i data-lucide="git-pull-request" class="w-4 h-4 text-gray-400"></i>
+            <button id="typeCloneBtn" class="p-2.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-800/50 text-slate-600 dark:text-gray-400 font-medium text-left flex items-center space-x-2 hover:border-slate-400">
+              <i data-lucide="git-pull-request" class="w-4 h-4 text-slate-500"></i>
               <span>Cloner un repo Git</span>
             </button>
           </div>
@@ -331,27 +354,27 @@
 
         <!-- Project Name -->
         <div>
-          <label class="block text-gray-300 font-medium mb-1">Nom du projet *</label>
-          <input type="text" id="newProjectName" placeholder="ex: mon-service-api" class="w-full bg-[#16161a] border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-sky-500">
-          <span class="text-[10px] text-gray-500">Uniquement minuscules, chiffres et tirets.</span>
+          <label class="block text-slate-700 dark:text-gray-300 font-medium mb-1">Nom du projet *</label>
+          <input type="text" id="newProjectName" placeholder="ex: mon-service-api" class="w-full bg-slate-50 dark:bg-[#16161a] border border-slate-300 dark:border-gray-700 rounded-lg px-3 py-2 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-sky-500">
+          <span class="text-[10px] text-slate-400">Minuscules, chiffres et tirets uniquement.</span>
         </div>
 
         <!-- Git URL field (if clone) -->
         <div id="gitUrlContainer" class="hidden">
-          <label class="block text-gray-300 font-medium mb-1">URL du dépôt Git distant *</label>
-          <input type="text" id="newProjectGitUrl" placeholder="https://github.com/utilisateur/mon-depot.git" class="w-full bg-[#16161a] border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-sky-500">
+          <label class="block text-slate-700 dark:text-gray-300 font-medium mb-1">URL du dépôt Git distant *</label>
+          <input type="text" id="newProjectGitUrl" placeholder="https://github.com/utilisateur/mon-depot.git" class="w-full bg-slate-50 dark:bg-[#16161a] border border-slate-300 dark:border-gray-700 rounded-lg px-3 py-2 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-sky-500">
         </div>
 
         <!-- Description -->
         <div id="projectDescContainer">
-          <label class="block text-gray-300 font-medium mb-1">Description (optionnelle)</label>
-          <input type="text" id="newProjectDesc" placeholder="Courte description pour le README initial" class="w-full bg-[#16161a] border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-sky-500">
+          <label class="block text-slate-700 dark:text-gray-300 font-medium mb-1">Description (optionnelle)</label>
+          <input type="text" id="newProjectDesc" placeholder="Courte description pour le README initial" class="w-full bg-slate-50 dark:bg-[#16161a] border border-slate-300 dark:border-gray-700 rounded-lg px-3 py-2 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-sky-500">
         </div>
       </div>
 
-      <div class="px-4 py-3 bg-[#18181b] border-t border-gray-700 flex justify-end space-x-2">
-        <button id="btnCancelProject" class="px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 text-xs font-medium">Annuler</button>
-        <button id="btnCreateProjectSubmit" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition flex items-center space-x-1.5">
+      <div class="px-4 py-3 bg-slate-50 dark:bg-[#18181b] border-t border-slate-200 dark:border-gray-700 flex justify-end space-x-2">
+        <button id="btnCancelProject" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-gray-700 text-slate-600 dark:text-gray-300 hover:bg-slate-200 dark:hover:bg-gray-800 text-xs font-medium">Annuler</button>
+        <button id="btnCreateProjectSubmit" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition flex items-center space-x-1.5 shadow">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span>Créer le projet</span>
         </button>
