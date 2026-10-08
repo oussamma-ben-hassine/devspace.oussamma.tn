@@ -878,6 +878,33 @@ app.get('/api/ai/models', requireAuth, async (req, res) => {
   res.json({ models: configuredModels });
 });
 
+// Endpoint récupération clé Gemini du coffre-fort pour appel direct depuis le navigateur (contourne le blocage IP datacenter)
+app.get('/api/gemini/credentials', requireAuth, async (req, res) => {
+  const userAccessToken = req.session?.access_token;
+  if (!userAccessToken) {
+    return res.status(401).json({ error: 'Non authentifié auprès du SSO' });
+  }
+
+  try {
+    const ssoRes = await fetch(`${SSO_BASE_URL}/api/v1/vault/providers/gemini/token`, {
+      headers: {
+        'Authorization': `Bearer ${userAccessToken}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!ssoRes.ok) {
+      return res.status(ssoRes.status).json({ error: 'Aucune clé Gemini active dans votre coffre-fort' });
+    }
+
+    const data = await ssoRes.json();
+    return res.json({ apiKey: data.token, model: 'gemini-3.5-flash' });
+  } catch (err) {
+    console.error('Erreur récupération clé Gemini:', err);
+    return res.status(500).json({ error: 'Erreur lors de la récupération de la clé Gemini' });
+  }
+});
+
 app.post('/api/ai/prompt', requireAuth, async (req, res) => {
   const { prompt, currentFile, fileContent, projectName, model } = req.body;
   const userAccessToken = req.session.access_token;

@@ -562,27 +562,77 @@ async function sendAiPrompt(promptText) {
   const activeTab = openTabs.find(t => t.path === currentFile);
   const currentContent = monacoEditor ? monacoEditor.getValue() : (activeTab ? activeTab.content : null);
 
+  const selectedModel = document.getElementById('aiModelSelect').value || 'gemini';
+  const isGemini = selectedModel.toLowerCase().includes('gemini') || selectedModel.toLowerCase().includes('google');
+
+  // Construction du prompt contextuel
+  let contextualPrompt = `Tu es l'assistant de programmation intelligent de DevSpace.\n`;
+  contextualPrompt += `Projet actif: ${currentProject || 'inconnu'}\n`;
+  if (currentFile) {
+    contextualPrompt += `Fichier en cours d'édition: ${currentFile}\n`;
+    if (currentContent) {
+      contextualPrompt += `\n--- CONTENU ACTUEL DU FICHIER (${currentFile}) ---\n${currentContent}\n--- FIN DU CONTENU ---\n\n`;
+    }
+  }
+  contextualPrompt += `Demande du développeur:\n${promptText}\n\nFournis une réponse précise, en markdown avec les blocs de code appropriés.`;
+
   try {
-    const res = await fetch('/api/ai/prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: promptText,
-        currentFile: currentFile,
-        fileContent: currentContent,
-        projectName: currentProject,
-        model: document.getElementById('aiModelSelect').value,
-      }),
-    });
+    let reply = '';
 
-    const data = await res.json();
+    // Si Gemini est choisi, appel direct depuis le navigateur pour contourner le blocage IP datacenter de Google
+    if (isGemini) {
+      try {
+        const credRes = await fetch('/api/gemini/credentials');
+        if (credRes.ok) {
+          const credData = await credRes.json();
+          if (credData.apiKey) {
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${credData.apiKey.trim()}`;
+            const gRes = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: contextualPrompt }] }],
+                generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
+              }),
+            });
 
-    if (!res.ok) {
-      aiBubble.innerHTML = `<p class="text-rose-400">Erreur : ${escapeHtml(data.error || 'Erreur inconnue')}</p>`;
-      return;
+            if (gRes.ok) {
+              const gData = await gRes.json();
+              reply = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            } else {
+              const errTxt = await gRes.text().catch(() => '');
+              console.warn('Appel direct Gemini navigateur non concluant:', gRes.status, errTxt);
+            }
+          }
+        }
+      } catch (geminiErr) {
+        console.warn('Appel direct Gemini navigateur échoué, repli sur le serveur:', geminiErr);
+      }
     }
 
-    const formattedReply = renderAiMarkdown(data.reply);
+    // Si aucun résultat via l'appel direct, repli sur le proxy serveur
+    if (!reply) {
+      const res = await fetch('/api/ai/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptText,
+          currentFile: currentFile,
+          fileContent: currentContent,
+          projectName: currentProject,
+          model: selectedModel,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        aiBubble.innerHTML = `<p class="text-rose-400">Erreur : ${escapeHtml(data.error || 'Erreur inconnue')}</p>`;
+        return;
+      }
+      reply = data.reply;
+    }
+
+    const formattedReply = renderAiMarkdown(reply);
     aiBubble.innerHTML = `
       <div class="space-y-2">
         <div class="prose prose-invert max-w-none text-xs leading-relaxed text-gray-200">
