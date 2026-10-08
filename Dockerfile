@@ -19,9 +19,10 @@ COPY . .
 RUN mkdir -p /app/workspace
 
 # Configuration globale minimale de Git pour le conteneur
-RUN git config --global user.name "DevSpace" && \
-    git config --global user.email "dev@oussamma.tn" && \
-    git config --global init.defaultBranch main
+RUN git config --system --add safe.directory "*" && \
+    git config --system user.name "DevSpace" && \
+    git config --system user.email "dev@oussamma.tn" && \
+    git config --system init.defaultBranch main
 
 # Exposition du port d'écoute
 EXPOSE 3000

@@ -46,6 +46,12 @@ if (!fs.existsSync(WORKSPACE_ROOT)) {
   fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
 }
 
+// Configuration globale Git pour autoriser les répertoires montés en volume (évite l'erreur dubious ownership)
+try {
+  execFile('git', ['config', '--global', '--add', 'safe.directory', '*'], () => {});
+  execFile('git', ['config', '--global', 'init.defaultBranch', 'main'], () => {});
+} catch (_) {}
+
 // Détection de proxy pour Coolify / Traefik
 app.set('trust proxy', true);
 
@@ -138,19 +144,30 @@ async function isGitRepository(dirPath) {
   if (!dirPath || !fs.existsSync(dirPath)) return false;
   const gitDir = path.join(dirPath, '.git');
   if (!fs.existsSync(gitDir)) return false;
+
+  // Si le dossier .git existe et contient le fichier HEAD ou le sous-dossier objects/refs, c'est structurellement un dépôt Git
+  const hasHead = fs.existsSync(path.join(gitDir, 'HEAD'));
+  const hasConfig = fs.existsSync(path.join(gitDir, 'config'));
+  if (hasHead || hasConfig) {
+    return true;
+  }
+
   try {
-    const { stdout } = await execFileAsync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dirPath });
+    const { stdout } = await execFileAsync('git', ['-c', 'safe.directory=*', 'rev-parse', '--is-inside-work-tree'], { cwd: dirPath });
     return stdout.trim() === 'true';
-  } catch {
+  } catch (err) {
+    console.warn(`isGitRepository check warning on ${dirPath}:`, err.message);
     return false;
   }
 }
 
 async function runGit(args, cwd) {
   try {
-    const { stdout, stderr } = await execFileAsync('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 });
+    const safeArgs = ['-c', 'safe.directory=*', ...args];
+    const { stdout, stderr } = await execFileAsync('git', safeArgs, { cwd, maxBuffer: 10 * 1024 * 1024 });
     return { success: true, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (err) {
+    console.error(`runGit [git ${args.join(' ')}] failed:`, err.stderr || err.message);
     return {
       success: false,
       stdout: err.stdout ? err.stdout.trim() : '',
@@ -397,13 +414,20 @@ app.post('/api/projects/create', requireAuth, async (req, res) => {
       const initRes = await runGit(['init', '-b', 'main'], projectDir);
       if (!initRes.success) {
         // Fallback sans -b si git plus ancien
-        await runGit(['init'], projectDir);
+        const initFallback = await runGit(['init'], projectDir);
+        if (!initFallback.success) {
+          console.error('git init failed:', initFallback.stderr);
+          await fs.promises.rm(projectDir, { recursive: true, force: true });
+          return res.status(500).json({ error: `Échec git init: ${initFallback.stderr}` });
+        }
         await runGit(['checkout', '-b', 'main'], projectDir);
       }
 
       // 2. Configuration git de base pour les commits locaux
-      await runGit(['config', 'user.name', req.session.user.name || 'DevSpace User'], projectDir);
-      await runGit(['config', 'user.email', req.session.user.email || 'dev@oussamma.tn'], projectDir);
+      const authorName = req.session?.user?.name || 'DevSpace User';
+      const authorEmail = req.session?.user?.email || 'dev@oussamma.tn';
+      await runGit(['config', 'user.name', authorName], projectDir);
+      await runGit(['config', 'user.email', authorEmail], projectDir);
 
       // 3. Fichiers par défaut
       const readmeContent = `# ${cleanName}\n\n${description || 'Projet créé dans DevSpace.'}\n\n---\n*Espace de développement personnel DevSpace - Dépôt Git initialisé.*`;
@@ -412,14 +436,22 @@ app.post('/api/projects/create', requireAuth, async (req, res) => {
       const gitignoreContent = `node_modules/\n.env\n*.log\n.DS_Store\n__pycache__/\nbuild/\ndist/\n`;
       await fs.promises.writeFile(path.join(projectDir, '.gitignore'), gitignoreContent, 'utf8');
 
-      // 4. Commit initial obligatoire
+      // 4. Commit initial obligatoire avec fallback auteur explicite
       await runGit(['add', '.'], projectDir);
-      await runGit(['commit', '-m', 'chore: initial commit (devspace)'], projectDir);
+      const commitRes = await runGit([
+        '-c', `user.name=${authorName}`,
+        '-c', `user.email=${authorEmail}`,
+        'commit', '-m', 'chore: initial commit (devspace)'
+      ], projectDir);
+      if (!commitRes.success) {
+        console.warn('Warning commit initial:', commitRes.stderr);
+      }
     }
 
     // Vérification finale de sécurité : le dossier doit ABSOLUMENT être un dépôt Git
     const verifyGit = await isGitRepository(projectDir);
     if (!verifyGit) {
+      console.error(`Validation Git finale échouée sur ${projectDir}`);
       await fs.promises.rm(projectDir, { recursive: true, force: true });
       return res.status(500).json({ error: 'Échec de la validation Git obligatoire.' });
     }
