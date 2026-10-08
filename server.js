@@ -897,20 +897,41 @@ app.post('/api/ai/prompt', requireAuth, async (req, res) => {
   }
   contextualPrompt += `Demande du développeur:\n${prompt}\n\nFournis une réponse précise, en markdown avec les blocs de code appropriés.`;
 
+  const selectedModel = String(model || 'gemini').toLowerCase();
+  const isGemini = selectedModel.includes('gemini') || selectedModel.includes('google');
+  const targetProvider = isGemini ? 'gemini' : (selectedModel.includes('codex') ? 'openai_codex' : 'openai');
+  const targetModel = isGemini ? 'gemini-3.5-flash' : 'gpt-4o';
+
   try {
-    const ssoAiRes = await fetch(SSO_AI_PROMPT_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${userAccessToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: contextualPrompt,
-        model: model || 'gpt-4o',
-        provider: 'openai_codex',
-      }),
-    });
+    const callSSO = async (prov, mod) => {
+      return await fetch(SSO_AI_PROMPT_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userAccessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: contextualPrompt,
+          model: mod,
+          provider: prov,
+        }),
+      });
+    };
+
+    let ssoAiRes = await callSSO(targetProvider, targetModel);
+
+    // Fallbacks si le provider n'est pas supporté sous ce nom
+    if (ssoAiRes.status === 400) {
+      const errCheck = await ssoAiRes.clone().text();
+      if (errCheck.includes('non supporté') || errCheck.includes('not supported')) {
+        if (targetProvider === 'gemini') {
+          ssoAiRes = await callSSO('google', targetModel);
+        } else if (targetProvider === 'openai_codex') {
+          ssoAiRes = await callSSO('openai', targetModel);
+        }
+      }
+    }
 
     if (!ssoAiRes.ok) {
       const errText = await ssoAiRes.text();
@@ -925,7 +946,7 @@ app.post('/api/ai/prompt', requireAuth, async (req, res) => {
 
     res.json({
       reply,
-      model: aiData.model || model,
+      model: aiData.model || targetModel,
     });
   } catch (err) {
     console.error('Erreur communication LLM SSO:', err);
