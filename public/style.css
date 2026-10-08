@@ -1,0 +1,83 @@
+/* Custom styles for DevSpace IDE */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+.activity-btn.active {
+  color: #38bdf8 !important;
+  background-color: rgba(56, 189, 248, 0.1);
+  border-left: 2px solid #38bdf8;
+}
+
+.tree-node {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-node:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.tree-node.selected {
+  background-color: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.editor-tab {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-family: monospace;
+  color: #9ca3af;
+  border-right: 1px solid #27272a;
+  background-color: #18181b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.editor-tab:hover {
+  color: #f3f4f6;
+  background-color: #202024;
+}
+
+.editor-tab.active {
+  color: #ffffff;
+  background-color: #1e1e1e;
+  border-bottom: 2px solid #38bdf8;
+}
+
+/* Chat bubble styling */
+.chat-msg-user {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-left: 16px;
+}
+
+.chat-msg-ai {
+  background: #18181b;
+  border: 1px solid #27272a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-right: 16px;
+}
