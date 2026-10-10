@@ -5,3 +5,4 @@ workspace/*
 .DS_Store
 Thumbs.db
 *.log
+*.ps1

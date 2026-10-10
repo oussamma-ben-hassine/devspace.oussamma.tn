@@ -1157,6 +1157,6 @@ server.listen(PORT, () => {
   console.log(`🚀 DevSpace opérationnel sur ${APP_URL} (Port ${PORT})`);
   console.log(`📁 Dossier Workspace : ${WORKSPACE_ROOT}`);
   console.log(`🔐 SSO Endpoint : ${SSO_BASE_URL}`);
-  console.log(`🤖 LLM Endpoint : ${SSO_AI_PROMPT_ENDPOINT}`);
+  console.log(`🤖 LLM Gateway : ${DEFAULT_LITELLM_BASE_URL}`);
   console.log(`=======================================================`);
 });
