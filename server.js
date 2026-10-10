@@ -48,50 +48,6 @@ export function getExecEnv() {
 
 let GIT_BIN = 'git';
 
-function resolveGitBinary() {
-  const candidates = [
-    'git',
-    '/usr/bin/git',
-    '/usr/local/bin/git',
-    '/bin/git',
-    '/nix/var/nix/profiles/default/bin/git',
-    '/root/.nix-profile/bin/git',
-  ];
-
-  for (const bin of candidates) {
-    try {
-      execSync(`${bin} --version`, { env: getExecEnv(), stdio: 'ignore' });
-      GIT_BIN = bin;
-      console.log(`✓ Binaire Git détecté : ${bin}`);
-      return true;
-    } catch (_) {}
-  }
-  return false;
-}
-
-// Détection / installation automatique au démarrage
-if (!resolveGitBinary()) {
-  console.warn('⚠️ Git introuvable dans le PATH standard. Tentative d\'installation automatique...');
-  try {
-    execSync('apk add --no-cache git bash', { env: getExecEnv(), stdio: 'inherit' });
-    resolveGitBinary();
-  } catch (_) {}
-  if (GIT_BIN === 'git') {
-    try {
-      execSync('apt-get update && apt-get install -y git', { env: getExecEnv(), stdio: 'inherit' });
-      resolveGitBinary();
-    } catch (_) {}
-  }
-}
-
-// Configuration globale Git pour safe.directory et branch main
-try {
-  execFile(GIT_BIN, ['config', '--global', '--add', 'safe.directory', '*'], { env: getExecEnv() }, () => {});
-  execFile(GIT_BIN, ['config', '--global', 'init.defaultBranch', 'main'], { env: getExecEnv() }, () => {});
-  execFile(GIT_BIN, ['config', '--global', 'user.name', 'DevSpace'], { env: getExecEnv() }, () => {});
-  execFile(GIT_BIN, ['config', '--global', 'user.email', 'dev@oussamma.tn'], { env: getExecEnv() }, () => {});
-} catch (_) {}
-
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
@@ -120,8 +76,12 @@ const DEFAULT_LITELLM_MODEL = process.env.LITELLM_DEFAULT_MODEL || 'gemini/gemin
 
 // Dossier racine des workspaces
 const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_DIR || path.join(__dirname, 'workspace'));
-if (!fs.existsSync(WORKSPACE_ROOT)) {
-  fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
+try {
+  if (!fs.existsSync(WORKSPACE_ROOT)) {
+    fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
+  }
+} catch (e) {
+  console.warn('WORKSPACE_ROOT mkdir warning:', e.message);
 }
 
 // Détection de proxy pour Coolify / Traefik
@@ -1086,26 +1046,33 @@ app.get('*', (req, res) => {
 // WEBSOCKET POUR TERMINAL EN TEMPS RÉEL (ISOLÉ AU PROJET)
 // =============================================================================
 server.on('upgrade', (request, socket, head) => {
-  const url = new URL(request.url, `http://${request.headers.host}`);
-  if (url.pathname.startsWith('/ws/terminal/')) {
-    wss.handleUpgrade(request, socket, head, ws => {
-      wss.emit('connection', ws, request);
-    });
-  } else {
+  try {
+    const host = request.headers.host || 'localhost';
+    const url = new URL(request.url, `http://${host}`);
+    if (url.pathname.startsWith('/ws/terminal/')) {
+      wss.handleUpgrade(request, socket, head, ws => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  } catch {
     socket.destroy();
   }
 });
 
 wss.on('connection', (ws, request) => {
-  const url = new URL(request.url, `http://${request.headers.host}`);
-  const projectName = url.pathname.replace('/ws/terminal/', '').replace(/\/$/, '');
-  const projectDir = getProjectDirectory(projectName);
+  try {
+    const host = request.headers.host || 'localhost';
+    const url = new URL(request.url, `http://${host}`);
+    const projectName = url.pathname.replace('/ws/terminal/', '').replace(/\/$/, '');
+    const projectDir = getProjectDirectory(projectName);
 
-  if (!projectDir || !fs.existsSync(projectDir)) {
-    ws.send(JSON.stringify({ type: 'error', data: 'Projet introuvable ou accès refusé.\r\n' }));
-    ws.close();
-    return;
-  }
+    if (!projectDir || !fs.existsSync(projectDir)) {
+      ws.send(JSON.stringify({ type: 'error', data: 'Projet introuvable ou accès refusé.\r\n' }));
+      ws.close();
+      return;
+    }
 
   // Shell adapté au système hôte (sh sous Alpine/Linux, powershell sous Windows en local)
   const isWindows = process.platform === 'win32';
