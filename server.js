@@ -52,6 +52,13 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
+server.on('error', (err) => {
+  console.error('FATAL SERVER ERROR:', err);
+});
+wss.on('error', (err) => {
+  console.error('FATAL WSS ERROR:', err);
+});
+
 const PORT = process.env.PORT || 3000;
 const APP_URL = (process.env.APP_URL || 'https://devspace.oussamma.tn').replace(/\/$/, '');
 
