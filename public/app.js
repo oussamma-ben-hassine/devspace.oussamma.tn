@@ -7,6 +7,7 @@ let wsTerminal = null;
 let activePanel = 'explorer';
 let createProjectType = 'init';
 let currentTheme = localStorage.getItem('devspace_theme') || 'dark';
+let aiChatHistory = []; // Historique de conversation pour le standard OpenAI LiteLLM
 
 // Initialisation au chargement
 document.addEventListener('DOMContentLoaded', async () => {
@@ -561,25 +562,43 @@ async function loadGitStatus() {
 }
 
 // =============================================================================
-// ASSISTANT IA (SSO LLM) AVEC CRÉATION DE FICHIERS DIRECTE
+// =============================================================================
+// ASSISTANT IA (PASSERELLE UNIVERSELLE LITELLM & SSO)
 // =============================================================================
 async function loadAiModels() {
+  const select = document.getElementById('aiModelSelect');
   try {
     const res = await fetch('/api/ai/models');
     if (!res.ok) return;
     const data = await res.json();
-    const select = document.getElementById('aiModelSelect');
     select.innerHTML = '';
+
+    if (!data.models || data.models.length === 0) {
+      const fallbackModel = data.defaultModel || 'gemini/gemini-3.1-flash-lite-preview';
+      const opt = document.createElement('option');
+      opt.value = fallbackModel;
+      opt.textContent = fallbackModel;
+      select.appendChild(opt);
+      return;
+    }
+
+    const defaultModel = data.defaultModel || '';
 
     data.models.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.id;
       opt.textContent = m.name;
-      if (m.id === 'sso_codex') opt.selected = true;
+      if (defaultModel && m.id === defaultModel) {
+        opt.selected = true;
+      }
       select.appendChild(opt);
     });
+
+    if (!select.value && select.options.length > 0) {
+      select.selectedIndex = 0;
+    }
   } catch (err) {
-    console.warn('Erreur modèles IA:', err);
+    console.warn('Erreur chargement modèles IA LiteLLM:', err);
   }
 }
 
@@ -601,7 +620,7 @@ async function sendAiPrompt(promptText) {
   aiBubble.innerHTML = `
     <div class="flex items-center space-x-2 text-sky-600 dark:text-sky-400 text-xs">
       <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
-      <span>L'IA analyse et génère le code...</span>
+      <span>L'IA analyse et génère le code via LiteLLM...</span>
     </div>
   `;
   messagesContainer.appendChild(aiBubble);
@@ -610,82 +629,33 @@ async function sendAiPrompt(promptText) {
 
   const activeTab = openTabs.find(t => t.path === currentFile);
   const currentContent = monacoEditor ? monacoEditor.getValue() : (activeTab ? activeTab.content : null);
-
-  const selectedModel = document.getElementById('aiModelSelect').value || 'sso_codex';
-  const isGemini = selectedModel.toLowerCase().includes('gemini') || selectedModel.toLowerCase().includes('google');
-
-  // Construction du prompt contextuel avec consigne de nommage de fichier
-  let contextualPrompt = `Tu es l'assistant de programmation intelligent de DevSpace.\n`;
-  contextualPrompt += `Projet actif: ${currentProject || 'inconnu'}\n`;
-  if (currentFile) {
-    contextualPrompt += `Fichier en cours d'édition: ${currentFile}\n`;
-    if (currentContent) {
-      contextualPrompt += `\n--- CONTENU ACTUEL DU FICHIER (${currentFile}) ---\n${currentContent}\n--- FIN DU CONTENU ---\n\n`;
-    }
-  }
-  contextualPrompt += `Consigne importante: Quand tu génères du code pour un fichier ou que le développeur demande de créer un fichier (ex: index.html, style.css, script.js), indique TOUJOURS son nom précis avant le bloc au format [FICHIER: nom_du_fichier] suivi du bloc de code complet markdown \`\`\`lang ... \`\`\`.\n`;
-  contextualPrompt += `Demande du développeur:\n${promptText}\n\nFournis une réponse claire, complète et directement utilisable.`;
+  const selectedModel = document.getElementById('aiModelSelect').value || '';
 
   try {
-    let reply = '';
+    const res = await fetch('/api/ai/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: promptText,
+        currentFile: currentFile,
+        fileContent: currentContent,
+        projectName: currentProject,
+        model: selectedModel,
+        conversationHistory: aiChatHistory.slice(-8),
+      }),
+    });
 
-    // Si Gemini est choisi, appel direct depuis le navigateur pour contourner le blocage IP datacenter de Google
-    if (isGemini) {
-      try {
-        const credRes = await fetch('/api/gemini/credentials');
-        if (credRes.ok) {
-          const credData = await credRes.json();
-          if (credData.apiKey) {
-            const apiKey = credData.apiKey.trim();
-            const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash'];
-            for (const mName of modelsToTry) {
-              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${apiKey}`;
-              const gRes = await fetch(geminiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: contextualPrompt }] }],
-                  generationConfig: { maxOutputTokens: 8192, temperature: 0.7 },
-                }),
-              });
-
-              if (gRes.ok) {
-                const gData = await gRes.json();
-                reply = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                if (reply) break;
-              } else {
-                const errTxt = await gRes.text().catch(() => '');
-                console.warn(`Appel direct Gemini (${mName}) non concluant:`, gRes.status, errTxt);
-              }
-            }
-          }
-        }
-      } catch (geminiErr) {
-        console.warn('Appel direct Gemini navigateur échoué, repli sur le serveur:', geminiErr);
-      }
+    const data = await res.json();
+    if (!res.ok) {
+      aiBubble.innerHTML = `<p class="text-rose-500">Erreur : ${escapeHtml(data.error || 'Erreur inconnue')}</p>`;
+      return;
     }
 
-    // Si aucun résultat via l'appel direct, repli sur le proxy serveur
-    if (!reply) {
-      const res = await fetch('/api/ai/prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: promptText,
-          currentFile: currentFile,
-          fileContent: currentContent,
-          projectName: currentProject,
-          model: selectedModel,
-        }),
-      });
+    const reply = data.reply || '';
 
-      const data = await res.json();
-      if (!res.ok) {
-        aiBubble.innerHTML = `<p class="text-rose-500">Erreur : ${escapeHtml(data.error || 'Erreur inconnue')}</p>`;
-        return;
-      }
-      reply = data.reply;
-    }
+    // Mémoriser dans l'historique conversationnel
+    aiChatHistory.push({ role: 'user', content: promptText });
+    aiChatHistory.push({ role: 'assistant', content: reply });
 
     const { formattedHtml, firstFile } = renderAiMarkdown(reply, promptText);
 

@@ -24,10 +24,11 @@ Espace de développement personnel en ligne, sécurisé par **SSO personnel (OID
      - Soit initialisation automatique avec branche `main`, `.gitignore`, `README.md` et premier commit (`git init`).
    - Outils Git intégrés dans l'interface : statut des fichiers modifiés, logs des commits, bouton de commit avec message.
 
-4. **Copilot IA Connecté au SSO** :
-   - Intégration native avec le service IA du SSO (`/api/v1/integrations/ai/prompt`).
-   - Récupération dynamique des modèles configurés dans le Vault du SSO (ex. OpenAI Codex / GPT-4o, Google Gemini).
-   - Conscience contextuelle du fichier actif, avec boutons d'actions rapides (explication, tests unitaires, refactoring) et insertion en 1 clic dans l'éditeur.
+4. **Copilot IA Universel (Passerelle LiteLLM & SSO)** :
+   - Intégration avec la passerelle universelle LiteLLM (`https://ai.oussamma.tn/v1`) au standard universel OpenAI (`/v1/chat/completions`).
+   - 100% agnostique de fournisseur (Google Gemini, OpenAI, Anthropic Claude, DeepSeek, Mistral, Ollama, etc.).
+   - Découverte dynamique des modèles (`GET /v1/models`) et configuration synchronisée via le SSO (`/api/v1/integrations/ai/gateway-config`).
+   - Conscience contextuelle du fichier actif, création automatique ou en 1 clic de fichiers dans le projet, et insertion dans l'éditeur.
 
 5. **Éditeur de Code Monaco & Terminal Web** :
    - Moteur Monaco Editor (l'éditeur de VS Code) avec coloration syntaxique complète, raccourci `Ctrl+S`, onglets multiples.

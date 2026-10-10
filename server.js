@@ -104,8 +104,11 @@ const SSO_AUTH_ENDPOINT = `${SSO_BASE_URL}/oauth/authorize`;
 const SSO_TOKEN_ENDPOINT = `${SSO_BASE_URL}/oauth/token`;
 const SSO_USERINFO_ENDPOINT = `${SSO_BASE_URL}/oauth/userinfo`;
 const SSO_LOGOUT_ENDPOINT = `${SSO_BASE_URL}/oauth/logout`;
-const SSO_AI_PROMPT_ENDPOINT = `${SSO_BASE_URL}/api/v1/integrations/ai/prompt`;
-const SSO_VAULT_PROVIDERS_ENDPOINT = `${SSO_BASE_URL}/api/v1/vault/providers/configured`;
+const SSO_GATEWAY_CONFIG_ENDPOINT = `${SSO_BASE_URL}/api/v1/integrations/ai/gateway-config`;
+
+const DEFAULT_LITELLM_BASE_URL = (process.env.LITELLM_BASE_URL || 'https://ai.oussamma.tn/v1').replace(/\/+$/, '');
+const DEFAULT_LITELLM_API_KEY = process.env.LITELLM_API_KEY || 'sk-oussamma-master-gateway-2026';
+const DEFAULT_LITELLM_MODEL = process.env.LITELLM_DEFAULT_MODEL || 'gemini/gemini-3.1-flash-lite-preview';
 
 // Dossier racine des workspaces
 const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_DIR || path.join(__dirname, 'workspace'));
@@ -819,183 +822,179 @@ app.post('/api/projects/:name/exec', requireAuth, checkProjectScope, (req, res) 
 });
 
 // =============================================================================
-// API LLM CONNECTÉE DIRECTEMENT AU SSO
+// PASSERELLE IA UNIVERSELLE LITELLM & SSO (STANDARD OPENAI)
 // =============================================================================
-app.get('/api/ai/models', requireAuth, async (req, res) => {
-  const userAccessToken = req.session.access_token;
-  const configuredModels = [];
 
+// Helper pour récupérer la configuration de la passerelle IA (dynamique via SSO ou variables d'environnement)
+async function getAiGatewayConfig(userAccessToken) {
+  let gatewayUrl = DEFAULT_LITELLM_BASE_URL;
+  let apiKey = DEFAULT_LITELLM_API_KEY;
+  let defaultModel = DEFAULT_LITELLM_MODEL;
+
+  // Récupération dynamique depuis le SSO (recommandé si authentifié)
   if (userAccessToken) {
     try {
-      const vaultRes = await fetch(SSO_VAULT_PROVIDERS_ENDPOINT, {
+      const ssoRes = await fetch(SSO_GATEWAY_CONFIG_ENDPOINT, {
         headers: {
           'Authorization': `Bearer ${userAccessToken}`,
           'Accept': 'application/json',
         },
       });
 
-      if (vaultRes.ok) {
-        const providers = await vaultRes.json();
-        for (const p of providers) {
-          const provName = (p.provider || '').toLowerCase();
-          if (provName === 'openai_codex' || provName === 'codex' || provName === 'sso') {
-            configuredModels.unshift({
-              id: 'sso_codex',
-              name: 'GPT-4o (Codex SSO)',
-              description: 'Proxy Codex fourni par le SSO',
-              provider: 'openai_codex',
-            });
-          } else if (provName === 'gemini' || provName === 'google') {
-            configuredModels.push({
-              id: 'gemini',
-              name: 'Gemini 2.0 Flash',
-              description: 'Google AI Studio',
-              provider: 'gemini',
-            });
-          } else if (provName === 'openai') {
-            configuredModels.push({
-              id: 'openai',
-              name: 'OpenAI GPT-4o',
-              description: 'Clé OpenAI du Vault',
-              provider: 'openai',
-            });
-          }
+      if (ssoRes.ok) {
+        const configData = await ssoRes.json();
+        if (configData.gateway_url) {
+          const rawUrl = String(configData.gateway_url).replace(/\/+$/, '');
+          gatewayUrl = rawUrl.endsWith('/v1') ? rawUrl : `${rawUrl}/v1`;
+        }
+        if (configData.api_key) {
+          apiKey = String(configData.api_key).trim();
+        }
+        if (configData.default_model) {
+          defaultModel = String(configData.default_model).trim();
         }
       }
-    } catch (e) {
-      console.warn('Erreur vérification Vault SSO:', e.message);
+    } catch (err) {
+      console.warn('Impossible de récupérer la gateway-config SSO, repli sur les variables d\'environnement:', err.message);
     }
   }
 
-  // Modèles par défaut si aucun provider n'est retourné
-  if (configuredModels.length === 0) {
-    configuredModels.push(
-      { id: 'sso_codex', name: 'GPT-4o (Codex SSO)', provider: 'openai_codex' },
-      { id: 'gemini', name: 'Gemini 2.0 Flash', provider: 'gemini' }
-    );
+  if (!gatewayUrl.endsWith('/v1')) {
+    gatewayUrl = `${gatewayUrl}/v1`;
   }
 
-  res.json({ models: configuredModels });
-});
+  return { gatewayUrl, apiKey, defaultModel };
+}
 
-// Endpoint récupération clé Gemini du coffre-fort pour appel direct depuis le navigateur (contourne le blocage IP datacenter)
-app.get('/api/gemini/credentials', requireAuth, async (req, res) => {
+// Étape 1 : Liste dynamique des modèles via GET /v1/models de LiteLLM
+app.get('/api/ai/models', requireAuth, async (req, res) => {
   const userAccessToken = req.session?.access_token;
-  if (!userAccessToken) {
-    return res.status(401).json({ error: 'Non authentifié auprès du SSO' });
-  }
+  const { gatewayUrl, apiKey, defaultModel } = await getAiGatewayConfig(userAccessToken);
 
   try {
-    const ssoRes = await fetch(`${SSO_BASE_URL}/api/v1/vault/providers/gemini/token`, {
+    const response = await fetch(`${gatewayUrl}/models`, {
       headers: {
-        'Authorization': `Bearer ${userAccessToken}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Accept': 'application/json',
       },
     });
 
-    if (!ssoRes.ok) {
-      return res.status(ssoRes.status).json({ error: 'Aucune clé Gemini active dans votre coffre-fort' });
-    }
+    if (response.ok) {
+      const data = await response.json();
+      const modelsList = (data.data || []).map(m => ({
+        id: m.id,
+        name: m.id,
+        description: m.owned_by ? `Fournisseur : ${m.owned_by}` : 'LiteLLM Model',
+      }));
 
-    const data = await ssoRes.json();
-    return res.json({ apiKey: data.token, model: 'gemini-2.0-flash' });
+      // Si le modèle par défaut est présent, le placer en tête de liste
+      if (defaultModel) {
+        const defaultIndex = modelsList.findIndex(m => m.id === defaultModel);
+        if (defaultIndex > -1) {
+          const [def] = modelsList.splice(defaultIndex, 1);
+          modelsList.unshift(def);
+        } else if (modelsList.length === 0) {
+          modelsList.unshift({ id: defaultModel, name: defaultModel, description: 'Modèle par défaut' });
+        }
+      }
+
+      return res.json({ models: modelsList, defaultModel });
+    } else {
+      const errText = await response.text();
+      console.warn(`Erreur récupération modèles LiteLLM (${response.status}):`, errText);
+    }
   } catch (err) {
-    console.error('Erreur récupération clé Gemini:', err);
-    return res.status(500).json({ error: 'Erreur lors de la récupération de la clé Gemini' });
+    console.warn('Erreur appel LiteLLM /models:', err.message);
   }
+
+  // Repli gracieux si la passerelle est momentanément indisponible
+  res.json({
+    models: [
+      { id: defaultModel, name: defaultModel, description: 'Modèle par défaut' },
+    ],
+    defaultModel,
+  });
 });
 
+// Étape 2 : Appels LLM au format standard universel OpenAI via POST /v1/chat/completions
 app.post('/api/ai/prompt', requireAuth, async (req, res) => {
-  const { prompt, currentFile, fileContent, projectName, model } = req.body;
-  const userAccessToken = req.session.access_token;
+  const { prompt, currentFile, fileContent, projectName, model, conversationHistory } = req.body;
+  const userAccessToken = req.session?.access_token;
 
   if (!prompt || !prompt.trim()) {
     return res.status(400).json({ error: 'Prompt vide.' });
   }
 
-  // Construction du message avec le contexte du projet actif
-  let contextualPrompt = `Tu es l'assistant de programmation intelligent de DevSpace.\n`;
-  contextualPrompt += `Projet actif: ${projectName || 'inconnu'}\n`;
+  const { gatewayUrl, apiKey, defaultModel } = await getAiGatewayConfig(userAccessToken);
+  const targetModel = model || defaultModel;
+
+  // Instructions système riches et adaptées au devspace
+  let systemPrompt = `Tu es l'assistant de programmation intelligent de DevSpace, un IDE Web moderne.\n`;
+  systemPrompt += `Projet actif: ${projectName || 'inconnu'}\n`;
   if (currentFile) {
-    contextualPrompt += `Fichier en cours d'édition: ${currentFile}\n`;
+    systemPrompt += `Fichier en cours d'édition: ${currentFile}\n`;
     if (fileContent) {
-      contextualPrompt += `\n--- CONTENU ACTUEL DU FICHIER (${currentFile}) ---\n${fileContent}\n--- FIN DU CONTENU ---\n\n`;
+      systemPrompt += `\n--- CONTENU ACTUEL DU FICHIER (${currentFile}) ---\n${fileContent}\n--- FIN DU CONTENU ---\n\n`;
     }
   }
-  contextualPrompt += `Demande du développeur:\n${prompt}\n\nFournis une réponse précise, en markdown avec les blocs de code appropriés.`;
+  systemPrompt += `Consigne importante: Quand tu génères du code pour un fichier ou que le développeur demande de créer un fichier (ex: index.html, style.css, script.js), indique TOUJOURS son nom précis avant le bloc au format [FICHIER: nom_du_fichier] suivi du bloc de code complet markdown \`\`\`lang ... \`\`\`.\n`;
+  systemPrompt += `Fournis une réponse claire, complète et directement utilisable.`;
 
-  const selectedModel = String(model || 'sso_codex').toLowerCase();
-  const isGemini = selectedModel.includes('gemini') || selectedModel.includes('google');
-  const targetProvider = isGemini ? 'gemini' : (selectedModel.includes('codex') ? 'openai_codex' : 'openai');
-  const targetModel = isGemini ? 'gemini-2.0-flash' : 'gpt-4o';
+  // Construction des messages selon le standard OpenAI
+  const messages = [
+    { role: 'system', content: systemPrompt },
+  ];
+
+  // Intégration de l'historique conversationnel si disponible
+  if (Array.isArray(conversationHistory)) {
+    for (const msg of conversationHistory) {
+      if (msg && msg.role && msg.content) {
+        messages.push({ role: msg.role, content: String(msg.content) });
+      }
+    }
+  }
+
+  messages.push({ role: 'user', content: prompt });
 
   try {
-    const callSSO = async (prov, mod) => {
-      return await fetch(SSO_AI_PROMPT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${userAccessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: contextualPrompt,
-          model: mod,
-          provider: prov,
-        }),
-      });
-    };
+    const response = await fetch(`${gatewayUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: targetModel,
+        messages: messages,
+        temperature: 0.7,
+      }),
+    });
 
-    let ssoAiRes = await callSSO(targetProvider, targetModel);
-
-    // Fallbacks si le provider n'est pas supporté sous ce nom
-    if (ssoAiRes.status === 400) {
-      const errCheck = await ssoAiRes.clone().text();
-      if (errCheck.includes('non supporté') || errCheck.includes('not supported')) {
-        if (targetProvider === 'gemini') {
-          ssoAiRes = await callSSO('google', targetModel);
-        } else if (targetProvider === 'openai_codex') {
-          ssoAiRes = await callSSO('openai', targetModel);
-        }
-      }
-    }
-
-    // Si Gemini échoue (ex: 424 avec blocage d'IP datacenter chez Google), repli transparent sur OpenAI Codex (GPT-4o)
-    if (!ssoAiRes.ok && (isGemini || ssoAiRes.status === 424)) {
-      console.warn(`Erreur service IA SSO (${ssoAiRes.status}), repli automatique de secours sur OpenAI Codex (GPT-4o)...`);
+    if (!response.ok) {
+      let errorMsg = '';
       try {
-        const fallbackCodex = await callSSO('openai_codex', 'gpt-4o');
-        if (fallbackCodex.ok) {
-          ssoAiRes = fallbackCodex;
-        } else {
-          const fallbackOpenAi = await callSSO('openai', 'gpt-4o');
-          if (fallbackOpenAi.ok) {
-            ssoAiRes = fallbackOpenAi;
-          }
-        }
-      } catch (fbErr) {
-        console.warn('Fallback Codex failed:', fbErr.message);
+        const errJson = await response.json();
+        errorMsg = errJson.error?.message || errJson.detail || JSON.stringify(errJson);
+      } catch (_) {
+        errorMsg = await response.text();
       }
-    }
-
-    if (!ssoAiRes.ok) {
-      const errText = await ssoAiRes.text();
-      console.error('Erreur retournée par le LLM SSO:', ssoAiRes.status, errText);
-      return res.status(ssoAiRes.status).json({
-        error: `Erreur du service IA SSO (${ssoAiRes.status}) : ${errText}`,
+      console.error(`Erreur LiteLLM (${response.status}):`, errorMsg);
+      return res.status(response.status).json({
+        error: `Erreur passerelle IA LiteLLM (${response.status}) : ${errorMsg}`,
       });
     }
 
-    const aiData = await ssoAiRes.json();
-    const reply = aiData.reply || aiData.response || aiData.text || aiData.content || (typeof aiData === 'string' ? aiData : JSON.stringify(aiData));
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || '';
 
     res.json({
       reply,
-      model: aiData.model || targetModel,
+      model: targetModel,
+      usage: data.usage,
     });
   } catch (err) {
-    console.error('Erreur communication LLM SSO:', err);
-    res.status(500).json({ error: `Erreur de communication avec le LLM SSO: ${err.message}` });
+    console.error('Erreur appel passerelle LiteLLM:', err);
+    res.status(500).json({ error: `Erreur de communication avec la passerelle IA LiteLLM : ${err.message}` });
   }
 });
 
