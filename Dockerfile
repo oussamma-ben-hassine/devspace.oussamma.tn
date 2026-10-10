@@ -39,4 +39,4 @@ ENV PORT=3000 \
     WORKSPACE_DIR=/app/workspace \
     SESSION_SECRET=devspace-oussamma-super-secret-key-2026-prod
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node server.js || { echo 'CRASH: node server.js failed with exit code '$?; sleep 3600; }"]
