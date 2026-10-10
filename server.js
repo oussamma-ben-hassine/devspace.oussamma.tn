@@ -119,6 +119,11 @@ if (!fs.existsSync(WORKSPACE_ROOT)) {
 // Détection de proxy pour Coolify / Traefik
 app.set('trust proxy', true);
 
+// Healthcheck prioritaire pour Docker et Coolify
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Redirection automatique stricte vers HTTPS + HSTS
 app.use((req, res, next) => {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -1152,7 +1157,7 @@ wss.on('connection', (ws, request) => {
 });
 
 // Démarrage du serveur
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
   console.log(`🚀 DevSpace opérationnel sur ${APP_URL} (Port ${PORT})`);
   console.log(`📁 Dossier Workspace : ${WORKSPACE_ROOT}`);

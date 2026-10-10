@@ -28,8 +28,8 @@ RUN git config --system --add safe.directory "*" && \
 EXPOSE 3000
 
 # Sonde de santé pour Coolify
-HEALTHCHECK --interval=20s --timeout=4s --start-period=5s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1
+HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1
 
 # Variables d'environnement intégrées (configurées pour Coolify)
 ENV PORT=3000 \
