@@ -704,6 +704,7 @@ app.delete('/api/projects/:name/item', requireAuth, checkProjectScope, async (re
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
 // =============================================================================
 // PRÉVISUALISATION WEB EN DIRECT (LIVE PREVIEW)
 // =============================================================================
