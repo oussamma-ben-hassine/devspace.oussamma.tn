@@ -14,6 +14,14 @@ import { WebSocketServer } from 'ws';
 const execFileAsync = promisify(execFile);
 dotenv.config();
 
+process.on('uncaughtException', (err) => {
+  console.error('FATAL UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+console.log('>>> DEVSPACE BOOTING: Node', process.version, 'PID', process.pid);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
