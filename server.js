@@ -1004,7 +1004,7 @@ app.post('/api/ai/prompt', requireAuth, async (req, res) => {
       body: JSON.stringify({
         model: targetModel,
         messages: messages,
-        temperature: 0.7,
+        drop_params: true,
       }),
     });
 
