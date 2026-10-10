@@ -724,6 +724,63 @@ app.delete('/api/projects/:name/item', requireAuth, checkProjectScope, async (re
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+// =============================================================================
+// PRÉVISUALISATION WEB EN DIRECT (LIVE PREVIEW)
+// =============================================================================
+function escapeHtmlServer(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+app.get('/preview/:name', requireAuth, checkProjectScope, (req, res) => {
+  res.redirect(`/preview/${encodeURIComponent(req.params.name)}/index.html`);
+});
+
+app.get('/preview/:name/*', requireAuth, checkProjectScope, (req, res) => {
+  const relPath = req.params[0] || 'index.html';
+  const filePath = resolveSafePath(req.projectDir, relPath);
+
+  if (!filePath || !fs.existsSync(filePath)) {
+    return res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>404 - Fichier introuvable</title>
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 40px; text-align: center; }
+          .card { max-width: 500px; margin: 40px auto; background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+          h2 { color: #38bdf8; margin-top: 0; }
+          code { background: #0f172a; padding: 3px 8px; border-radius: 6px; color: #f43f5e; font-family: monospace; }
+          p { color: #cbd5e1; font-size: 14px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>📄 Fichier introuvable</h2>
+          <p>Le fichier <code>${escapeHtmlServer(relPath)}</code> n'existe pas encore dans le projet <strong>${escapeHtmlServer(req.params.name)}</strong>.</p>
+          <p>Demandez simplement à l'IA dans DevSpace : <em>"Crée un fichier index.html avec ..."</em> pour le générer instantanément !</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  const stat = fs.statSync(filePath);
+  if (stat.isDirectory()) {
+    const indexPath = path.join(filePath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
+    return res.status(404).send('<h3>Dossier sans fichier index.html</h3>');
+  }
+
+  res.sendFile(filePath);
 });
 
 // =============================================================================

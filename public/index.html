@@ -87,8 +87,14 @@
       <span id="breadcrumbFile" class="text-slate-800 dark:text-gray-200 truncate">aucun fichier</span>
     </div>
 
-    <!-- Right: Theme Switcher + Status + SSO User -->
-    <div class="flex items-center space-x-2.5">
+    <!-- Right: Preview + Theme Switcher + Status + SSO User -->
+    <div class="flex items-center space-x-2 sm:space-x-2.5">
+      <!-- LIVE PREVIEW BUTTON -->
+      <button id="btnOpenLivePreview" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition" title="Lancer l'aperçu Web de votre application">
+        <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+        <span class="hidden sm:inline">Tester / Aperçu</span>
+      </button>
+
       <!-- Save notification -->
       <div id="saveStatus" class="hidden sm:flex text-xs text-emerald-500 items-center space-x-1 opacity-0 transition-opacity">
         <i data-lucide="check" class="w-3.5 h-3.5"></i>
@@ -374,6 +380,47 @@
           <i data-lucide="check" class="w-4 h-4"></i>
           <span>Créer le projet</span>
         </button>
+      </div>
+  <!-- MODAL / DRAWER LIVE PREVIEW (APERÇU EN DIRECT DU PROJET) -->
+  <div id="livePreviewModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white dark:bg-[#1e1e24] w-full max-w-5xl h-[88vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-300 dark:border-gray-700">
+      
+      <!-- Preview Header -->
+      <div class="h-10 px-3 bg-slate-100 dark:bg-[#16161a] border-b border-slate-200 dark:border-gray-800 flex items-center justify-between shrink-0 text-xs">
+        <div class="flex items-center space-x-2">
+          <span class="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Aperçu Web en direct</span>
+          </span>
+          <span id="previewProjectBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-gray-800 text-slate-600 dark:text-gray-300 font-mono">[projet]</span>
+        </div>
+
+        <!-- Viewport Size Switcher -->
+        <div class="hidden sm:flex items-center space-x-1 bg-slate-200 dark:bg-gray-800 p-0.5 rounded-md">
+          <button id="btnViewportDesktop" class="px-2 py-0.5 rounded text-[10px] font-medium bg-white dark:bg-gray-700 text-slate-800 dark:text-white shadow-xs">Bureau</button>
+          <button id="btnViewportTablet" class="px-2 py-0.5 rounded text-[10px] font-medium text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white">Tablette</button>
+          <button id="btnViewportMobile" class="px-2 py-0.5 rounded text-[10px] font-medium text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white">Mobile</button>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center space-x-1.5">
+          <button id="btnRefreshPreview" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-300" title="Actualiser l'aperçu">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+          <a id="btnExternalPreview" href="#" target="_blank" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-300 flex items-center gap-1" title="Ouvrir dans un nouvel onglet">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </a>
+          <button id="btnCloseLivePreview" class="p-1.5 rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 text-slate-400" title="Fermer l'aperçu">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview Iframe Container -->
+      <div class="flex-1 w-full h-full bg-slate-200 dark:bg-black/40 flex items-center justify-center overflow-hidden p-0 sm:p-2">
+        <div id="previewFrameWrapper" class="w-full h-full bg-white transition-all duration-200 rounded-none sm:rounded-md shadow-inner overflow-hidden">
+          <iframe id="livePreviewFrame" class="w-full h-full border-0 bg-white" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+        </div>
       </div>
     </div>
   </div>

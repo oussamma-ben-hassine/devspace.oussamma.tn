@@ -482,6 +482,7 @@ async function saveCurrentFile() {
       setTimeout(() => { saveStatus.style.opacity = '0'; }, 1500);
 
       await loadGitStatus();
+      notifyLivePreviewReload();
     } else {
       alert('Erreur lors de l\'enregistrement du fichier.');
     }
@@ -713,6 +714,7 @@ async function createProjectFile(fileName, content) {
       await loadFileTree();
       await openFile(fileName.trim(), fileName.trim().split('/').pop());
       await loadGitStatus();
+      notifyLivePreviewReload();
       return true;
     } else {
       const err = await res.json();
@@ -943,6 +945,72 @@ async function executeTerminalCommand(cmd) {
     if (data.stderr) appendTerminalLine(data.stderr, 'text-rose-400');
   } catch (err) {
     appendTerminalLine(`Erreur d'exécution: ${err.message}`, 'text-rose-400');
+  }
+}
+
+// =============================================================================
+// GESTION DU LIVE PREVIEW (PRÉVISUALISATION WEB EN DIRECT)
+// =============================================================================
+function openLivePreview() {
+  if (!currentProject) {
+    alert('Veuillez sélectionner ou créer un projet pour lancer l\'aperçu.');
+    return;
+  }
+  const modal = document.getElementById('livePreviewModal');
+  const frame = document.getElementById('livePreviewFrame');
+  const badge = document.getElementById('previewProjectBadge');
+  const externalLink = document.getElementById('btnExternalPreview');
+
+  badge.textContent = `[${currentProject}]`;
+  const previewUrl = `/preview/${encodeURIComponent(currentProject)}/index.html`;
+  frame.src = `${previewUrl}?t=${Date.now()}`;
+  externalLink.href = previewUrl;
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeLivePreview() {
+  const modal = document.getElementById('livePreviewModal');
+  const frame = document.getElementById('livePreviewFrame');
+  modal.classList.add('hidden');
+  frame.src = 'about:blank';
+}
+
+function refreshLivePreview() {
+  const modal = document.getElementById('livePreviewModal');
+  const frame = document.getElementById('livePreviewFrame');
+  if (!modal.classList.contains('hidden') && currentProject) {
+    frame.src = `/preview/${encodeURIComponent(currentProject)}/index.html?t=${Date.now()}`;
+  }
+}
+
+function notifyLivePreviewReload() {
+  const modal = document.getElementById('livePreviewModal');
+  if (modal && !modal.classList.contains('hidden')) {
+    refreshLivePreview();
+  }
+}
+
+function setPreviewViewport(type) {
+  const wrapper = document.getElementById('previewFrameWrapper');
+  const btnDesktop = document.getElementById('btnViewportDesktop');
+  const btnTablet = document.getElementById('btnViewportTablet');
+  const btnMobile = document.getElementById('btnViewportMobile');
+
+  [btnDesktop, btnTablet, btnMobile].forEach(btn => {
+    btn.className = 'px-2 py-0.5 rounded text-[10px] font-medium text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white';
+  });
+
+  if (type === 'desktop') {
+    wrapper.style.maxWidth = '100%';
+    btnDesktop.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-white dark:bg-gray-700 text-slate-800 dark:text-white shadow-xs';
+  } else if (type === 'tablet') {
+    wrapper.style.maxWidth = '768px';
+    btnTablet.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-white dark:bg-gray-700 text-slate-800 dark:text-white shadow-xs';
+  } else if (type === 'mobile') {
+    wrapper.style.maxWidth = '375px';
+    btnMobile.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-white dark:bg-gray-700 text-slate-800 dark:text-white shadow-xs';
   }
 }
 
@@ -1250,6 +1318,14 @@ function initEventListeners() {
       setTimeout(() => { monacoEditor.layout(); }, 160);
     }
   });
+
+  // Événements Live Preview (Aperçu en direct)
+  document.getElementById('btnOpenLivePreview')?.addEventListener('click', openLivePreview);
+  document.getElementById('btnCloseLivePreview')?.addEventListener('click', closeLivePreview);
+  document.getElementById('btnRefreshPreview')?.addEventListener('click', refreshLivePreview);
+  document.getElementById('btnViewportDesktop')?.addEventListener('click', () => setPreviewViewport('desktop'));
+  document.getElementById('btnViewportTablet')?.addEventListener('click', () => setPreviewViewport('tablet'));
+  document.getElementById('btnViewportMobile')?.addEventListener('click', () => setPreviewViewport('mobile'));
 }
 
 function escapeHtml(text) {
