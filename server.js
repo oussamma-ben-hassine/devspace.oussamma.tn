@@ -1136,6 +1136,10 @@ wss.on('connection', (ws, request) => {
       ws.close();
     }
   });
+  } catch (err) {
+    console.error('WebSocket connection error:', err);
+    try { ws.close(); } catch {}
+  }
 });
 
 // Démarrage du serveur
