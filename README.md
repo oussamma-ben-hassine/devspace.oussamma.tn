@@ -7,7 +7,7 @@ Espace de développement personnel en ligne, sécurisé par **SSO personnel (OID
 ## 🌟 Fonctionnalités Principales
 
 1. **Authentification SSO OIDC & Sécurité** :
-   - Connecté au SSO `https://sso-a.oussamma.tn` avec flux sécurisé PKCE (RFC 7636) et signature HMAC des états.
+   - Connecté au SSO `https://sso.oussamma.tn/realms/platform` avec flux sécurisé PKCE (RFC 7636) et signature HMAC des états.
    - Sessions serveurs chiffrées avec cookies `HttpOnly` sécurisés.
    - Redirection automatique stricte HTTPS et compatibilité totale avec les reverse proxies Coolify / Traefik.
 
@@ -60,7 +60,7 @@ Espace de développement personnel en ligne, sécurisé par **SSO personnel (OID
 | :--- | :--- | :--- |
 | `PORT` | Port d'écoute interne du serveur | `3000` |
 | `APP_URL` | URL publique de l'application | `https://devspace.oussamma.tn` |
-| `SSO_BASE_URL` | URL de base de votre serveur SSO | `https://sso-a.oussamma.tn` |
+| `SSO_BASE_URL` | URL de base de votre serveur SSO | `https://sso.oussamma.tn/realms/platform` |
 | `SSO_CLIENT_ID` | Client ID OAuth2 fourni par le SSO | `client_424090bad2dcadc34cdda40f` |
 | `SSO_CLIENT_SECRET` | Secret client OAuth2 | `sec_RGhuA2Qsxu5YDZ_7NT4j8wNeWnGrd3l8E9dbeko0QcM` |
 | `SSO_REDIRECT_URI` | URL de redirection de callback | `https://devspace.oussamma.tn/auth/callback` |
