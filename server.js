@@ -65,20 +65,21 @@ const APP_URL = (process.env.APP_URL || 'https://devspace.oussamma.tn').replace(
 // =============================================================================
 // CONFIGURATION SSO & LLM
 // =============================================================================
-const SSO_BASE_URL = (process.env.SSO_BASE_URL || 'https://sso-a.oussamma.tn').replace(/\/$/, '');
+const SSO_BASE_URL = (process.env.SSO_BASE_URL || 'https://sso.oussamma.tn/realms/platform').replace(/\/$/, '');
+const SSO_API_BASE_URL = (process.env.SSO_API_BASE_URL || 'https://sso.oussamma.tn').replace(/\/$/, '');
 const SSO_CLIENT_ID = process.env.SSO_CLIENT_ID || 'client_424090bad2dcadc34cdda40f';
-const SSO_CLIENT_SECRET = process.env.SSO_CLIENT_SECRET || 'sec_RGhuA2Qsxu5YDZ_7NT4j8wNeWnGrd3l8E9dbeko0QcM';
+const SSO_CLIENT_SECRET = process.env.SSO_CLIENT_SECRET || '';
 const SSO_REDIRECT_URI = process.env.SSO_REDIRECT_URI || `${APP_URL}/auth/callback`;
 const SSO_SCOPES = process.env.SSO_SCOPES || 'openid profile email';
 
-const SSO_AUTH_ENDPOINT = `${SSO_BASE_URL}/oauth/authorize`;
-const SSO_TOKEN_ENDPOINT = `${SSO_BASE_URL}/oauth/token`;
-const SSO_USERINFO_ENDPOINT = `${SSO_BASE_URL}/oauth/userinfo`;
-const SSO_LOGOUT_ENDPOINT = `${SSO_BASE_URL}/oauth/logout`;
-const SSO_GATEWAY_CONFIG_ENDPOINT = `${SSO_BASE_URL}/api/v1/integrations/ai/gateway-config`;
+const SSO_AUTH_ENDPOINT = `${SSO_BASE_URL}/protocol/openid-connect/auth`;
+const SSO_TOKEN_ENDPOINT = `${SSO_BASE_URL}/protocol/openid-connect/token`;
+const SSO_USERINFO_ENDPOINT = `${SSO_BASE_URL}/protocol/openid-connect/userinfo`;
+const SSO_LOGOUT_ENDPOINT = `${SSO_BASE_URL}/protocol/openid-connect/logout`;
+const SSO_GATEWAY_CONFIG_ENDPOINT = `${SSO_API_BASE_URL}/api/v1/integrations/ai/gateway-config`;
 
 const DEFAULT_LITELLM_BASE_URL = (process.env.LITELLM_BASE_URL || 'https://ai.oussamma.tn/v1').replace(/\/+$/, '');
-const DEFAULT_LITELLM_API_KEY = process.env.LITELLM_API_KEY || 'sk-oussamma-master-gateway-2026';
+const DEFAULT_LITELLM_API_KEY = process.env.LITELLM_API_KEY || '';
 const DEFAULT_LITELLM_MODEL = process.env.LITELLM_DEFAULT_MODEL || 'gemini/gemini-3.1-flash-lite-preview';
 
 // Dossier racine des workspaces
@@ -117,12 +118,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Sessions serveur sécurisées
-const SESSION_SECRET = process.env.SESSION_SECRET || 'devspace-oussamma-super-secret-key-2026-prod';
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) throw new Error('SESSION_SECRET doit être configuré en production.');
 const sessionMiddleware = session({
   name: 'devspace_session',
   keys: [SESSION_SECRET],
   maxAge: 7 * 24 * 60 * 60 * 1000,
-  secure: false, // Fonctionne avec le reverse-proxy Coolify
+  secure: true, // Cookie HTTPS transmis par le reverse-proxy Coolify
   sameSite: 'lax',
   httpOnly: true,
 });
@@ -341,6 +343,10 @@ app.get('/auth/callback', async (req, res) => {
       (profile?.email && profile.email.toLowerCase() === 'oussammabenhassine@gmail.com')
     );
 
+    if (!isSuperAdmin) {
+      return res.status(403).send('DevSpace est réservé au super administrateur.');
+    }
+
     req.session.access_token = accessToken;
     req.session.refresh_token = refreshToken;
     req.session.user = {
@@ -362,7 +368,10 @@ app.get('/auth/callback', async (req, res) => {
 
 app.get('/auth/logout', (req, res) => {
   req.session = null;
-  res.redirect(`${SSO_LOGOUT_ENDPOINT}?redirect_uri=${encodeURIComponent(APP_URL + '/auth/login')}`);
+  const logoutUrl = new URL(SSO_LOGOUT_ENDPOINT);
+  logoutUrl.searchParams.set('client_id', SSO_CLIENT_ID);
+  logoutUrl.searchParams.set('post_logout_redirect_uri', `${APP_URL}/`);
+  res.redirect(logoutUrl.toString());
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
